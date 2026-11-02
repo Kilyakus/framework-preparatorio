@@ -1,0 +1,57 @@
+{
+  "name": "nodejs-preparatorio",
+  "version": "2.0.1",
+  "description": "Конфигурируемый интерфейс редактора с доковыми панелями и инструментами",
+  "type": "module",
+  "files": [
+    "src",
+    "demo",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": "./src/app/main.js",
+    "./styles.css": "./src/web/assets/css/index.css",
+    "./base.css": "./src/web/assets/css/base.css",
+    "./lumino.css": "./src/web/assets/css/lumino.css",
+    "./components.css": "./src/web/assets/css/components.css",
+    "./virtual-layout": "./src/app/virtual-layout.js",
+    "./compact-layout": "./src/app/compact-layout.js",
+    "./logo.svg": "./src/web/assets/images/preparatorio.svg",
+    "./mark.svg": "./src/web/assets/images/preparatorio-mark.svg"
+  },
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "vite build",
+    "test": "node --test tests/*.test.js",
+    "test:browser": "node tests/browser-regression.mjs && node tests/browser-custom-select.mjs"
+  },
+  "dependencies": {
+    "@lumino/application": "^2.4.11",
+    "@lumino/coreutils": "^2.2.3",
+    "@lumino/dragdrop": "^2.1.9",
+    "@lumino/virtualdom": "^2.0.5",
+    "@lumino/widgets": "^2.10.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.7",
+    "playwright": "^1.64.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kilyakus/nodejs-preparatorio.git"
+  },
+  "keywords": [
+    "studio",
+    "editor",
+    "dock",
+    "panels",
+    "ui",
+    "javascript"
+  ],
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  },
+  "license": "MIT"
+}
