@@ -1,8 +1,0 @@
-.demo-workspace {padding:0;position:relative;overflow:hidden}
-.demo-stage {position:absolute;inset:0;display:grid;place-items:center;overflow:hidden;background:radial-gradient(ellipse at 50% 47%,#292d32 0,#1d1d1d 48%,#181818 100%)}
-.demo-grid {position:absolute;left:-20%;right:-20%;bottom:-58%;height:95%;transform:perspective(430px) rotateX(58deg);background-image:linear-gradient(#ffffff0b 1px,transparent 1px),linear-gradient(90deg,#ffffff0b 1px,transparent 1px);background-size:36px 36px;mask-image:linear-gradient(to bottom,transparent,#000)}
-.demo-mark {position:relative;width:138px;height:138px;object-fit:contain;filter:drop-shadow(0 14px 20px #0009)}
-.demo-stage-caption {position:absolute;top:calc(50% + 95px);display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center}.demo-stage-caption strong {font-size:15px;color:#d5d5d5;font-weight:500}.demo-stage-caption span {font-size:11px;color:#858585}
-.demo-stage-badge {position:absolute;left:12px;bottom:12px;font-size:9px;letter-spacing:.08em;color:#808080;border:1px solid #363636;background:#202020;padding:5px 7px;border-radius:3px}
-.demo-tree {padding:4px 0}.demo-tree-row {display:flex;align-items:center;gap:6px;width:100%;height:25px;padding:0 7px;border:0;background:none;color:#aaa;text-align:left;font-size:11px}.demo-tree-row:hover {background:#303030}.demo-tree-row.selected {background:#3e5f91;color:#fff}.demo-kind{color:#91a8c5;width:14px;height:14px;flex:0 0 14px}.demo-item{flex:1}.demo-tree-row small{color:#8d8d8d;font-size:10px}
-#demo-log {font:11px/1.7 ui-monospace,monospace;color:#a4b7ca}
