@@ -3,7 +3,9 @@
 Функции без пометки экспортируются из корня пакета (`framework-preparatorio`).
 Функции с пометкой **браузер** требуют DOM и доступны из
 `framework-preparatorio/menu`, `framework-preparatorio/shell` или
-`framework-preparatorio/browser`.
+`framework-preparatorio/browser`. Правила без DOM (области, доступность,
+тулбар, справка, загрузка каталога) подключаются подпутями `/scopes`,
+`/topbar`, `/help`, `/runtime` и работают в Node.
 
 - [Реестр областей](#реестр-областей)
   - [createScopeRegistry](#createscoperegistry)
@@ -13,6 +15,7 @@
   - [bindScopes](#bindscopes)
 - [Доступность элементов управления](#доступность-элементов-управления)
   - [createScopeAvailability](#createscopeavailability)
+  - [bindScopeDependencies](#bindscopedependencies)
 - [Вклады меню](#вклады-меню)
   - [createMenuContributionRegistry](#createmenacontributionregistry)
   - [Готовые реестры «Вид» и «Просмотр»](#готовые-реестры-вид-и-просмотр)
@@ -25,6 +28,16 @@
   - [registerContributions](#registercontributions)
   - [loadEnginePlugins](#loadengineplugins)
   - [bindScopeImplementations](#bindscopeimplementations)
+- [Меню тулбара (`/topbar`)](#меню-тулбара-topbar)
+  - [validateTopbarMenus, validateTopbarSections](#validatetopbarmenus-validatetopbarsections)
+  - [collectTopbarMenus](#collecttopbarmenus)
+  - [toMenuSpec, topbarActions, helpMenuSpec](#tomenuspec-topbaractions-helpmenuspec)
+- [Справка (`/help`)](#справка-help)
+  - [validateHelp, collectHelpTopics](#validatehelp-collecthelptopics)
+  - [mountHelp](#mounthelp)
+- [Загрузка каталога (`/runtime`)](#загрузка-каталога-runtime)
+  - [createScopeLoader](#createscopeloader)
+  - [versionedModuleUrl, importScopeUrl](#versionedmoduleurl-importscopeurl)
 - [Меню (браузер)](#меню-браузер)
 - [Оболочка (браузер)](#оболочка-браузер)
 - [Типы данных](#типы-данных)
@@ -267,6 +280,96 @@ const bound = await bindScopeImplementations(registry, { engines, loaders });
 
 Модуль без зарегистрированного `id` пропускается. Возвращает идентификаторы
 связанных областей в порядке связывания.
+
+## Меню тулбара (`/topbar`)
+
+Модуль без DOM: чистые данные, читается в Node-тестах.
+
+### validateTopbarMenus, validateTopbarSections
+
+```js
+validateTopbarMenus(scope);     // true | бросает Error
+validateTopbarSections(scope);
+```
+
+Проверяют вклады `topbarMenus` (id и label) и `topbarSections` (id, label,
+непустой список пунктов, повтор id раздела, ровно одна команда у пункта).
+Вызываются реестром областей при регистрации паспорта.
+
+### collectTopbarMenus
+
+```js
+collectTopbarMenus(scopes) // → [{ id, label, order, shared, sections }]
+```
+
+Собирает меню из вкладов в порядке реестра. Категория, объявленная несколькими
+областями, получает `shared: true`; раздел без `menu` уходит в личное меню
+области; пустые категории в результат не попадают. Повторная регистрация
+категории или раздела — ошибка.
+
+### toMenuSpec, topbarActions, helpMenuSpec
+
+```js
+toMenuSpec(menus)      // → [{ id, label, shared, items }] — плоский список с разделителями
+topbarActions(menus)   // → ['fit', …] — все команды, проверка исполнителя
+helpMenuSpec(topics)   // → меню «Справка» или null, если тем нет
+```
+
+## Справка (`/help`)
+
+### validateHelp, collectHelpTopics
+
+```js
+validateHelp(scope);            // help.template обязателен и не пуст
+collectHelpTopics(scopes)       // → [{ id, label, order, template }]
+```
+
+Темы сортируются по `order`, затем по подписи. Сколько областей принесли
+`help.template` — столько тем.
+
+### mountHelp
+
+```js
+mountHelp(host, topics) // → { show(id), active(), topics(), dispose() }
+```
+
+Строит диалог: вкладки слева, содержимое справа, стрелки и Home/End водят по
+вкладкам. `dispose()` очищает контейнер.
+
+## Загрузка каталога (`/runtime`)
+
+### createScopeLoader
+
+```js
+const loader = createScopeLoader({ endpoint, preferred, host, rootHost, fetch });
+```
+
+| Параметр | По умолчанию | Назначение |
+| --- | --- | --- |
+| `endpoint` | `/api/scopes` | каталог областей у хоста |
+| `preferred` | `[]` | порядок id областей (решение приложения) |
+| `host` | `#studioContent, main.b-main` | контейнеры панелей |
+| `rootHost` | `#appRoot, body` | контейнеры областей уровня `root` |
+| `fetch` | `globalThis.fetch` | подмена загрузчика в тестах |
+
+Возвращает: `registry()`, `loadScopes()`, `importScopeModule()`, `listScopes()`,
+`getScope()`, `listTools()`, `listViewportContributions()`, `mountScopes()`,
+`activateScopes()`, `listTopbarMenus()`, `listHelpTopics()`, `listTopbarSpec()`.
+
+`loadScopes` кеширует успешный результат и не кеширует ошибку. `activateScopes`
+возвращает функцию очистки; ошибка одной области пишется в консоль и не
+останавливает остальные.
+
+### versionedModuleUrl, importScopeUrl
+
+```js
+versionedModuleUrl('/engine/viewport/index.js', 1700000000000);
+// → '/engine/viewport/index.js?scope-revision=1700000000000'
+await importScopeUrl('/engine/viewport/index.js');
+```
+
+`importScopeUrl` повторяет импорт один раз по URL с меткой `scope-retry`, чтобы
+пережить перезапуск хост-процесса; первая ошибка сохраняется в `cause`.
 
 ## Меню (браузер)
 

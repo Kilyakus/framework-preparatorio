@@ -25,8 +25,8 @@ export function useScopeRegistry(registry) {
 export const getScopeRegistry = () => current;
 export const getScope = (id) => current.get(id) ?? null;
 export const listScopes = () => current.list();
-export const mountScopes = (root) => mountScopeNodes(current, root);
+export const mountScopes = (root, options) => mountScopeNodes(current, root, options);
 
 export { createScopeRegistry, mountScopeNodes } from "./registry.js";
-export { createScopeAvailability } from "./dependencies.js";
+export { createScopeAvailability, bindScopeDependencies } from "./dependencies.js";
 export { bindScopes } from "./runtime.js";

@@ -1,8 +1,9 @@
 # framework-preparatorio
 
 Каркас интерфейса редактора на областях (scope): реестр областей, связывание
-паспорта с реализацией, управление доступностью элементов управления, вклады
-меню и сборка приложения из движков.
+паспорта с реализацией, управление доступностью элементов управления, меню и
+справка из вкладов областей, загрузка каталога областей и сборка приложения из
+движков.
 
 Пакет не содержит кода конкретного приложения: в нём нет ни одного имени
 панели, ни одной разметки и ни одной зависимости от 3D-движка. Области и их
@@ -24,6 +25,8 @@
 - [Контракт области](#контракт-области)
 - [Доступность элементов управления](#доступность-элементов-управления)
 - [Вклады меню](#вклады-меню)
+- [Меню тулбара и справка](#меню-тулбара-и-справка)
+- [Загрузка каталога областей](#загрузка-каталога-областей)
 - [Совместимость с uix-preparatorio](#совместимость-с-uix-preparatorio)
 - [API](#api)
 - [Тестирование](#тестирование)
@@ -39,7 +42,8 @@
 | Описать состав интерфейса | Паспорт области: идентификатор, зона дока, селектор, шаблон, инструменты |
 | Связать описание с кодом | `bind`/`bindScopes`: реализация сопоставляется паспорту по `id` |
 | Не показывать недоступное | `createScopeAvailability`: элементы управления гасятся, пока области нет |
-| Собрать меню без ручных списков | Реестры вкладов «Вид» и «меню области» |
+| Собрать меню без ручных списков | Реестры вкладов «Вид» и «меню области»; меню тулбара и справка — из вкладов областей |
+| Загрузить состав областей в браузере | `createScopeLoader`: каталог у хоста, порядок приложения, монтирование и активация |
 
 Каркас не выполняет: загрузку моделей, рендеринг, работу с файловой системой,
 хранение пользовательских данных и построение дока. Док, рельсы, секции и
@@ -302,6 +306,70 @@ menu.dispose();                     // вернуть узлы на исходн
 При изменении реестра в браузере генерируется событие
 `ui:<group>-contributions-changed`.
 
+## Меню тулбара и справка
+
+Меню в топбаре и диалог справки собираются из вкладов областей: статичных
+пунктов в каркасе нет.
+
+```js
+import { collectTopbarMenus, toMenuSpec, helpMenuSpec } from "framework-preparatorio/topbar";
+import { collectHelpTopics, mountHelp } from "framework-preparatorio/help";
+
+const menus = collectTopbarMenus(listScopes());
+const spec = toMenuSpec(menus);              // плоский список для построителя меню
+const topics = collectHelpTopics(listScopes());
+mountHelp(document.querySelector(".b-help-body"), topics);
+```
+
+Правила сборки:
+
+| Ситуация | Результат |
+| --- | --- |
+| Категорию отметили несколько областей | общее меню, разделы отделяются чертой и получают заголовок |
+| Категорию отметила одна область | личное меню области |
+| Раздел без `menu` | личное меню своей области (id области) |
+| Категория не объявлена | подпись берётся у области-владельца |
+| Область без справки | вкладки справки не появляются |
+
+Раздел описывается так:
+
+```js
+topbarMenus: [{ id: "view", label: "Вид", order: 30 }],
+topbarSections: [{
+  id: "viewport-camera", menu: "view", label: "Камера", order: 10,
+  items: [{ label: "Вписать", kbd: "Home", action: "fit" }, { separator: true }],
+}],
+```
+
+Пункт несёт ровно одну команду: `action`, `pose`, `view`, `env` или `help`.
+Неверный вклад отклоняется при регистрации паспорта — до сборки меню.
+
+## Загрузка каталога областей
+
+Каркас не обходит файловую систему: состав областей отдаёт хост приложения
+одним JSON-ответом. Загрузчик связывает этот протокол с реестром.
+
+```js
+import { createScopeLoader } from "framework-preparatorio/runtime";
+
+const loader = createScopeLoader({
+  endpoint: "/api/scopes",         // адрес каталога у хоста
+  preferred: ["outliner", "viewport"], // порядок областей — решение приложения
+  host: "#studioContent",           // контейнер панелей
+  rootHost: "body",                 // контейнер областей уровня root
+});
+
+await loader.mountScopes();          // каталог → реестр → разметка в слотах
+const stop = await loader.activateScopes({ shell, state });
+loader.listTools();                  // производные каталоги
+loader.listTopbarSpec();
+```
+
+Ответ хоста: `{ scopes: [{ folder, registry, entry, hasEntry, revision, definition? }] }`.
+`definition` — готовый паспорт; если его нет, загрузчик импортирует `registry`.
+`revision` версионирует URL модуля, поэтому после перезапуска хоста браузер
+берёт свежий файл. Ошибка запроса не кешируется: следующий вызов повторяет его.
+
 ## Совместимость с uix-preparatorio
 
 Библиотека `uix-preparatorio` создаёт док; каркас описывает области, которые в
@@ -352,9 +420,12 @@ const studio = await createStudio({
 | Группа | Функции |
 | --- | --- |
 | Реестр областей | `createScopeRegistry`, `mountScopeNodes`, `useScopeRegistry`, `getScopeRegistry`, `getScope`, `listScopes`, `mountScopes`, `bindScopes` |
-| Доступность | `createScopeAvailability` |
+| Доступность | `createScopeAvailability`, `bindScopeDependencies` |
 | Вклады меню | `createMenuContributionRegistry`, `createViewContributionRegistry`, `createViewportContributionRegistry`, `registerViewContribution`, `listViewContributions`, `registerViewportContribution`, `listViewportContributions`, `subscribe*`, `get*` |
 | Сборка | `createScopeOrder`, `sortEngines`, `availablePluginScopes`, `registerScopeDefinitions`, `registerContributions`, `loadEnginePlugins`, `bindScopeImplementations` |
+| Меню тулбара | `validateTopbarMenus`, `validateTopbarSections`, `collectTopbarMenus`, `toMenuSpec`, `topbarActions`, `helpMenuSpec` |
+| Справка | `validateHelp`, `collectHelpTopics`, `mountHelp` |
+| Загрузка каталога | `createScopeLoader`, `versionedModuleUrl`, `importScopeUrl` |
 | Меню (браузер) | `initMenuContributions`, `initViewMenu`, `initViewportMenu` |
 | Оболочка (браузер) | `initCollapsibleSections`, `installVirtualDockSizing`, `installCompactDockSizing`, `createToolCatalogue` |
 
@@ -364,28 +435,35 @@ const studio = await createStudio({
 npm test
 ```
 
-21 модульный тест на `node:test`: валидация паспортов, уникальность `id`,
-`areaId` и `selector`, связывание реализаций, загрузка через `loaders`,
-доступность элементов управления, реестры вкладов, правила сборки. Установка
-зависимостей и DOM для тестов не требуются.
+29 модульных тестов на `node:test`: валидация паспортов и вкладов (тулбар,
+справка), уникальность `id`, `areaId` и `selector`, связывание реализаций,
+загрузка через `loaders`, доступность элементов управления, реестры вкладов,
+правила сборки, порядок каталога областей и повторы динамического импорта.
+Установка зависимостей и DOM для тестов не требуются.
 
-Браузерные части (`mountScopeNodes`, `menu/`, `shell/`) проверяются в
-приложении: каркас используется в Morphia Studio, где сборка и запуск
-интерфейса входят в обязательные проверки.
+Браузерные части (`mountScopeNodes`, `menu/`, `shell/`, `mountHelp`)
+проверяются в приложениях: каркас используется в Rephlexia Studio 4.0.053 и
+Morphia Studio 2.0.142, где сборка и запуск интерфейса входят в обязательные
+проверки.
 
 ## Версионирование и синхронизация
 
-Репозиторий — источник истины для каркаса. Morphia Studio содержит точную
-копию файлов пакета в `src/framework` (кроме собственного `README.md`).
+Репозиторий — единственный источник истины для каркаса. Приложения не хранят
+его копий: они ставят пакет из Git и импортируют нужные подпути.
+
+```json
+"framework-preparatorio": "git+https://github.com/Kilyakus/framework-preparatorio.git#<коммит>"
+```
 
 Порядок изменения каркаса:
 
 1. правка и `npm test` в этом репозитории;
-2. копирование `src/**` в `morphia/src/framework/`;
-3. в приложении — `npm run check:core && npm run check:content && npm run build`.
+2. коммит и публикация (`git push`);
+3. в приложении — новый пин на коммит, `npm install`, затем `npm test`.
 
-Версии: пакет ведётся по семантическому версионированию, соответствие версии
-приложения фиксируется в [CHANGELOG](CHANGELOG.md).
+Пин на коммит, а не на ветку: сборка приложения не зависит от текущего
+состояния репозитория. Соответствие версий приложений фиксируется в
+[CHANGELOG](CHANGELOG.md).
 
 ## Лицензия
 

@@ -20,6 +20,7 @@ export {
   mountScopes,
   bindScopes,
   createScopeAvailability,
+  bindScopeDependencies,
 } from "./scopes/index.js";
 
 export {

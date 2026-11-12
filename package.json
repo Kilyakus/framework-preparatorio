@@ -1,7 +1,7 @@
 {
   "name": "framework-preparatorio",
-  "version": "1.0.0",
-  "description": "Каркас интерфейса редактора на областях (scope): реестр областей, связывание паспорта с реализацией, доступность элементов управления, вклады меню, сборка приложения из движков",
+  "version": "1.1.0",
+  "description": "Каркас интерфейса редактора на областях (scope): реестр областей, связывание паспорта с реализацией, доступность элементов управления, меню тулбара и справка из вкладов областей, загрузка каталога областей, сборка приложения из движков",
   "type": "module",
   "license": "MIT",
   "author": "Kilyakus",
@@ -14,13 +14,16 @@
     "url": "https://github.com/Kilyakus/framework-preparatorio/issues"
   },
   "keywords": [
-    "framework",
-    "studio",
-    "editor",
-    "scope",
     "dock",
+    "editor",
+    "framework",
+    "help",
     "lumino",
-    "preparatorio"
+    "preparatorio",
+    "runtime",
+    "scope",
+    "studio",
+    "topbar"
   ],
   "files": [
     "src",
@@ -35,6 +38,9 @@
     "./scopes": "./src/scopes/index.js",
     "./contributions": "./src/contributions/view-contributions.js",
     "./menu": "./src/menu/index.js",
+    "./topbar": "./src/topbar/index.js",
+    "./help": "./src/help/index.js",
+    "./runtime": "./src/runtime/index.js",
     "./shell": "./src/shell/index.js",
     "./composition": "./src/composition/index.js",
     "./package.json": "./package.json"
@@ -42,8 +48,14 @@
   "scripts": {
     "test": "node --test tests/*.test.js"
   },
-  "dependencies": {
-    "uix-preparatorio": "git+https://github.com/Kilyakus/uix-preparatorio.git#4daffb32111b8145ba026b44bb6c3eff76838d23"
+  "dependencies": {},
+  "peerDependencies": {
+    "uix-preparatorio": ">=2.0.0"
+  },
+  "peerDependenciesMeta": {
+    "uix-preparatorio": {
+      "optional": true
+    }
   },
   "engines": {
     "node": ">=20"
