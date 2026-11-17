@@ -58,19 +58,33 @@ export function createAdaptiveResolution({min=.6}={}) {
 
 const getGL=renderer=>{try{return renderer.getContext?.()??null;}catch{return null;}};
 const getLimit=(gl,key)=>{try{return Number(gl?.getParameter?.(gl[key]))||Infinity;}catch{return Infinity;}};
+
+/** The browser may redact the adapter. Never infer hardware from an empty name. */
+export function viewportRendererInfo(renderer) {
+  const gl=getGL(renderer);let name='',vendor='';
+  try {
+    const ext=gl?.getExtension?.('WEBGL_debug_renderer_info');
+    if(ext){name=String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||'');vendor=String(gl.getParameter(ext.UNMASKED_VENDOR_WEBGL)||'');}
+  } catch {}
+  const software=/swiftshader|llvmpipe|softpipe|software raster|software renderer|basic render|lavapipe/i.test(`${vendor} ${name}`);
+  let contextLost=false;try{contextLost=!!gl?.isContextLost?.();}catch{}
+  return {name:name||null,vendor:vendor||null,classification:software?'software':name?'reported':'unknown',
+    context:gl?.constructor?.name??null,contextLost};
+}
+
 /** Conservative texture/renderbuffer ceiling; software renderers are capped. */
 export function viewportHardwareLimits(renderer) {
   const gl=getGL(renderer),caps=renderer.capabilities??{};
   const maxTexture=Math.max(1,Number(caps.maxTextureSize)||getLimit(gl,'MAX_TEXTURE_SIZE')||4096);
   const maxBuffer=getLimit(gl,'MAX_RENDERBUFFER_SIZE');
-  let shadowCeiling=Math.min(8192,maxTexture,maxBuffer), gpu='';
-  try {const ext=gl?.getExtension?.('WEBGL_debug_renderer_info');if(ext)gpu=String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)||'');} catch {}
-  if(/swiftshader|llvmpipe|softpipe|software|basic render/i.test(gpu))shadowCeiling=Math.min(shadowCeiling,2048);
+  let shadowCeiling=Math.min(8192,maxTexture,maxBuffer);
+  const rendererInfo=viewportRendererInfo(renderer),gpu=rendererInfo.name??'';
+  if(rendererInfo.classification==='software')shadowCeiling=Math.min(shadowCeiling,2048);
   if((globalThis.navigator?.hardwareConcurrency??8)<=4||(globalThis.navigator?.deviceMemory??8)<=4)shadowCeiling=Math.min(shadowCeiling,4096);
   shadowCeiling=Math.max(1,2**Math.floor(Math.log2(Math.max(1,shadowCeiling))));
   const maxAnisotropy=Math.max(1,Number(caps.getMaxAnisotropy?.())||1);
   let attributes=null;try{attributes=gl?.getContextAttributes?.()??null;}catch{}
-  return {maxTexture,maxBuffer,shadowCeiling,maxAnisotropy,gpu,attributes};
+  return {maxTexture,maxBuffer,shadowCeiling,maxAnisotropy,gpu,rendererInfo,attributes};
 }
 function keyForConstant(THREE,table,value,fallback){return Object.keys(table).find(key=>THREE[table[key]]!==undefined&&THREE[table[key]]===value)??fallback;}
 const collectMaterials=(scene,extra)=>{

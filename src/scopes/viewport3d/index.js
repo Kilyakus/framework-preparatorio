@@ -5,8 +5,13 @@ import { createViewportOrbit } from './orbit.js';
 
 export { createViewport3D, VIEWPORT3D_ID } from './runtime.js';
 export { VIEWPORT3D_VIEW_MODE, VIEWPORT3D_ORBIT_TOOL, createViewportModes, mountViewportModes } from './modes.js';
-export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics.js';
-export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportChrome } from './ui.js';
+export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics.js';
+export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui.js';
+export { mountViewportSection } from './sections.js';
+export { createViewportDisplay, mountViewportDisplay, contributeStudioGrid } from './display.js';
+export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studioMap, BUILTIN_VIEWPORT_ENVIRONMENTS } from './studio.js';
+export { createGridFloorClass } from './grid-floor.js';
+export { normalizeViewportEnvironment, discoverViewportEnvironments, createViewportEnvironments, mountViewportEnvironment } from './environments.js';
 export { createViewportOrbit } from './orbit.js';
 
 /** The scope remains opt-in, but its navigation and graphics ship by default. */
@@ -60,6 +65,7 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
         else viewport.render();
       };
       chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,ui:config.ui,
+        environmentOptions:config.environmentOptions,settingsOptions:config.settingsOptions,
         graphicsOptions:{...config.graphicsOptions,invalidate}});
       // A resized drawing buffer is cleared even when the pixel ratio is
       // unchanged, so a demand-rendered viewport must request a fresh frame.
@@ -80,6 +86,6 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
   }
   const dispose = () => {cancelRedraw();orbit?.dispose();orbit=null;chrome?.dispose();chrome=null;viewport.dispose();};
   dispose.viewport3d = viewport;
-  Object.defineProperties(dispose,{graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},orbit:{get:()=>orbit}});
+  Object.defineProperties(dispose,{graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},environment:{get:()=>chrome?.environment??null},display:{get:()=>chrome?.display??null},orbit:{get:()=>orbit}});
   return dispose;
 }

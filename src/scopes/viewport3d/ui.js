@@ -1,5 +1,8 @@
 import {createViewportModes,mountViewportModes} from './modes.js';
 import {createViewportGraphics} from './graphics.js';
+import {mountViewportSection} from './sections.js';
+import {createViewportDisplay,mountViewportDisplay,contributeStudioGrid} from './display.js';
+import {createViewportEnvironments,mountViewportEnvironment} from './environments.js';
 
 /** Shared, composable chrome. Host-specific scene and commands occupy their own slots. */
 export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><div class="v3d-mode-host" data-v3d-mode-host></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Настройки графики" aria-expanded="false" aria-haspopup="true" title="Графика">⚙ <span>Графика</span></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
@@ -7,7 +10,6 @@ export const VIEWPORT3D_TOOLS_TEMPLATE = `<div class="v3d-tools" data-v3d-tool-h
 export const VIEWPORT3D_TEMPLATE = `<section class="v3d-scope" data-viewport3d-scope aria-label="3D Просмотр">${VIEWPORT3D_HEADER_TEMPLATE}<div class="v3d-stage"><div class="v3d-container" data-viewport3d-container></div>${VIEWPORT3D_TOOLS_TEMPLATE}</div></section>`;
 
 const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
-  <div class="v3d-graphics-heading"><strong>Графика</strong><button type="button" data-v3d-reset title="Восстановить настройки графики">Сбросить</button></div>
   <details open><summary>Кадр и производительность</summary>
     <label class="range-row"><span>Масштаб разрешения</span><output data-v3d-output="renderScale"></output><input data-v3d-setting="renderScale" type="range" min="0.5" max="2" step="0.05"></label>
     <label class="range-row"><span>Предел плотности экрана</span><output data-v3d-output="maxPixelRatio"></output><input data-v3d-setting="maxPixelRatio" type="range" min="0.5" max="3" step="0.1"></label>
@@ -16,6 +18,12 @@ const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
     <div class="v3d-field"><span>Целевая частота</span><div data-v3d-select-slot="adaptiveTarget"></div></div>
     <p class="v3d-info">Под нагрузкой масштаб снижается и постепенно восстанавливается. На паузах и в скрытой вкладке замеры не учитываются.</p>
     <p class="v3d-info" data-v3d-context-info></p>
+    <p class="v3d-info v3d-renderer-info" data-v3d-renderer-info role="status"></p>
+    <button type="button" class="v3d-retry-gpu" data-v3d-retry-gpu hidden>Перезапустить с запросом GPU</button>
+    <p class="v3d-info" data-v3d-gpu-help hidden>Перезапуск перезагрузит страницу: сначала сохраните работу. Выбор GPU зависит от браузера, ОС и драйвера; повторный запрос не гарантирует аппаратное ускорение. Если рендерер остаётся программным, включите аппаратное ускорение и проверьте настройки видеокарты.</p>
+    <button type="button" class="v3d-retry-gpu" data-v3d-profile hidden>Снять профиль за 10 секунд</button>
+    <button type="button" class="v3d-retry-gpu" data-v3d-profile-download hidden>Скачать отчёт JSON</button>
+    <p class="v3d-info" data-v3d-profile-status role="status" aria-live="polite"></p>
   </details>
   <details open><summary>Цвет и тон</summary>
     <label class="range-row"><span>Экспозиция</span><output data-v3d-output="exposure"></output><input data-v3d-setting="exposure" type="range" min="0.2" max="3" step="0.01"></label>
@@ -90,12 +98,15 @@ const GRAPHICS_SELECTS = Object.freeze({
 });
 
 /** Render the same Preparatorio controls in a popup or a host settings slot. */
-export function mountViewportGraphics({host,graphics,legacyIds=false,ui}={}) {
+export function mountViewportGraphics({host,graphics,legacyIds=false,ui,sections,onSectionChange,retryGpu,onProfile}={}) {
   if(!host?.ownerDocument||!graphics)throw new TypeError('viewport graphics slot and controller are required');
   if(typeof ui?.createCustomSelect!=='function'||typeof ui?.syncRangeFill!=='function')
     throw new TypeError('viewport graphics require createCustomSelect and syncRangeFill from uix-preparatorio');
   const doc=host.ownerDocument, wrapper=doc.createElement('div');wrapper.innerHTML=GRAPHICS_TEMPLATE;
-  const root=wrapper.firstElementChild;host.append(root);
+  const root=wrapper.firstElementChild,content=[...root.childNodes];host.append(root);
+  const section=mountViewportSection({host:root,key:'graphics',label:'Графика',sections,onSectionChange});
+  section.body.append(...content);
+  const reset=doc.createElement('button');reset.type='button';reset.dataset.v3dReset='';reset.textContent='Сбросить';reset.title='Восстановить настройки графики';section.actions.append(reset);
   const abort=new AbortController(),signal=abort.signal,inputs=[...root.querySelectorAll('input[data-v3d-setting]')];
   const inputFor=name=>root.querySelector(`input[data-v3d-setting="${name}"]`);
   const selectors=new Map(), signatures=new Map(), disabledStates=new Map();
@@ -147,6 +158,17 @@ export function mountViewportGraphics({host,graphics,legacyIds=false,ui}={}) {
     root.querySelector('[data-v3d-resolution-info]').textContent=`Фактическая плотность: ${state.effectivePixelRatio.toFixed(2)}×${v.adaptiveResolution?` · адаптация ${Math.round(state.adaptiveScale*100)}%`:''}.`;
     const attrs=state.limits.attributes;
     root.querySelector('[data-v3d-context-info]').textContent=attrs?`Сглаживание MSAA: ${attrs.antialias?'включено':'выключено'} · буфер глубины: ${attrs.depth?'есть':'нет'}. Параметры WebGL-контекста задаются при создании окна.`:'Сглаживание и параметры WebGL-контекста задаются при создании окна.';
+    const info=state.limits.rendererInfo??{classification:'unknown',name:null};
+    root.querySelector('[data-v3d-renderer-info]').textContent=info.classification==='software'
+      ?`Программный рендерер (CPU): ${info.name}.`
+      :info.classification==='reported'?`Рендерер WebGL: ${info.name}. Выбор устройства сообщает браузер.`
+      :'Рендерер WebGL скрыт или недоступен: определить CPU/GPU нельзя.';
+    const canRetry=typeof retryGpu==='function',gpuHelp=root.querySelector('[data-v3d-gpu-help]');
+    root.querySelector('[data-v3d-retry-gpu]').hidden=info.classification!=='software'||!canRetry;
+    gpuHelp.hidden=info.classification!=='software';
+    gpuHelp.textContent=canRetry
+      ?'Перезапуск перезагрузит страницу: сначала сохраните работу. Выбор GPU зависит от браузера, ОС и драйвера; повторный запрос не гарантирует аппаратное ускорение. Если рендерер остаётся программным, включите аппаратное ускорение и проверьте настройки видеокарты.'
+      :'Выбор GPU зависит от браузера, ОС и драйвера. Проверьте аппаратное ускорение и настройки видеокарты.';
     const actual=state.shadowInfo?.size??state.shadows[0]?.size;
     root.querySelector('[data-v3d-shadow-info]').textContent=!hasShadow?'В сцене нет источника, отбрасывающего тени.':v.shadow==='off'?'Тени отключены':`Фактически: ${actual||'—'}² · предел устройства ${state.limits.shadowCeiling}²${v.shadow!=='auto'&&Number(v.shadow)>state.limits.shadowCeiling?' · ограничено устройством':''}.`;
     root.querySelector('[data-v3d-texture-info]').textContent=`Предел устройства: ${state.limits.maxAnisotropy}×. Переопределяются текстуры текущих материалов; исходные значения можно восстановить.`;
@@ -160,29 +182,62 @@ export function mountViewportGraphics({host,graphics,legacyIds=false,ui}={}) {
     },{signal});
   }
   root.querySelector('[data-v3d-reset]').addEventListener('click',()=>graphics.reset(),{signal});
+  root.querySelector('[data-v3d-retry-gpu]').addEventListener('click',()=>retryGpu?.(),{signal});
+  const profile=root.querySelector('[data-v3d-profile]'),download=root.querySelector('[data-v3d-profile-download]'),status=root.querySelector('[data-v3d-profile-status]');
+  let report=null;profile.hidden=typeof onProfile!=='function';
+  profile.addEventListener('click',async()=>{
+    if(profile.disabled)return;profile.disabled=true;download.hidden=true;status.textContent='Измеряем кадры; не скрывайте окно и не меняйте сцену…';
+    try{
+      report=await onProfile();if(disposed)return;
+      const gpu=report?.gpu?.elapsedMsPerRendererCall;
+      status.textContent=`${report?.fps??'—'} FPS · ${report?.metadata?.drawingBuffer?.join(' × ')??'—'} px · таймер WebGL: ${gpu?`${gpu.mean} мс/вызов`:'замер недоступен'}${report?.hiddenDuringMeasurement?' · окно скрывалось':''}. Полные данные — в JSON.`;
+      download.hidden=false;
+    }catch(error){if(!disposed)status.textContent=`Не удалось снять профиль: ${error?.message??error}`;}
+    finally{if(!disposed)profile.disabled=false;}
+  },{signal});
+  download.addEventListener('click',()=>{
+    if(!report)return;const url=URL.createObjectURL(new Blob([JSON.stringify(report,null,2)],{type:'application/json'}));
+    const link=doc.createElement('a');link.href=url;link.download='viewport-profile.json';doc.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  },{signal});
+  section.toggle.addEventListener('click',()=>{if(!section.expanded)for(const selector of selectors.values())selector.close();},{signal});
   off=graphics.subscribe(sync,{immediate:false});sync(graphics.snapshot());
   const Observer=doc.defaultView?.ResizeObserver;
   observer=Observer?new Observer(()=>{
     for(const selector of selectors.values())if(!selector.trigger.isConnected||!selector.trigger.getClientRects().length)selector.close();
   }):null;
   observer?.observe(root);
-  return {root,
+  return {root,section,
     containsPopup:target=>[...selectors.values()].some(selector=>selector.menu.contains(target)),
     closeSelects:()=>{for(const selector of selectors.values())selector.close();},dispose};
   } catch(error){dispose();throw error;}
 }
 
+/** Three built-in subsections can also be mounted in an existing host menu. */
+export function mountViewportSettings({host,environment,display,graphics,ui,sections,onSectionChange,onEnvironmentSelect,legacyIds=false,retryGpu,onProfile}={}) {
+  if(!host?.ownerDocument)throw new TypeError('viewport settings host is required');
+  let environmentUI=null,displayUI=null,graphicsUI=null,slot=null,disposed=false;
+  try {
+    environmentUI=mountViewportEnvironment({host,environment,sections,onSectionChange,onSelect:onEnvironmentSelect,legacyIds});
+    displayUI=mountViewportDisplay({host,display,sections,onSectionChange});
+    slot=host.ownerDocument.createElement('div');slot.dataset.v3dGraphicsSlot='';if(legacyIds)slot.id='viewportGraphicsSlot';host.append(slot);
+    graphicsUI=mountViewportGraphics({host:slot,graphics,legacyIds,ui,sections,onSectionChange,retryGpu,onProfile});
+  } catch(error) {graphicsUI?.dispose();slot?.remove();displayUI?.dispose();environmentUI?.dispose();throw error;}
+  return {environment:environmentUI,display:displayUI,graphics:graphicsUI,
+    containsPopup:target=>graphicsUI.containsPopup(target),closeSelects:()=>graphicsUI.closeSelects(),
+    dispose(){if(disposed)return;disposed=true;graphicsUI.dispose();slot.remove();displayUI.dispose();environmentUI.dispose();}};
+}
+
 /** Wire common slots. Hosts can provide existing mode/graphics controllers. */
-export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},modes=null,graphics=null,ui}={}) {
+export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},environmentOptions={},settingsOptions={},modes=null,graphics=null,environment=null,display=null,ui}={}) {
   if(!root?.querySelector||!viewport)throw new TypeError('viewport chrome requires root and viewport');
   if(typeof ui?.createCustomSelect!=='function'||typeof ui?.syncRangeFill!=='function')
     throw new TypeError('viewport chrome requires createCustomSelect and syncRangeFill from uix-preparatorio');
   const modeHost=root.querySelector('[data-v3d-mode-host]'),toolHost=root.querySelector('[data-v3d-tool-host]');
   const panel=root.querySelector('[data-v3d-graphics-panel]'),toggle=root.querySelector('[data-v3d-graphics-toggle]');
   if(!modeHost||!toolHost||!panel||!toggle)throw new Error('viewport chrome slots are missing');
-  const ownModes=!modes, ownGraphics=!graphics;
+  const ownModes=!modes, ownGraphics=!graphics,ownEnvironment=!environment,ownDisplay=!display;
   modes ||= createViewportModes(modeOptions);graphics ||= createViewportGraphics(viewport,graphicsOptions);
-  let modeUI,graphicsUI,observer,disposed=false,offDispose=()=>{};
+  let modeUI,graphicsUI,gridContribution,observer,disposed=false,offDispose=()=>{};
   const abort=new AbortController(),signal=abort.signal;
   const document=root.ownerDocument,originalParent=panel.parentNode,originalNext=panel.nextSibling,originalStyle=panel.getAttribute('style');
   const restorePanel=()=>{
@@ -191,7 +246,12 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     if(originalParent)originalParent.insertBefore(panel,originalNext?.parentNode===originalParent?originalNext:null);
   };
   try{
-    modeUI=mountViewportModes({modes,modeHost,toolHost,ui});graphicsUI=mountViewportGraphics({host:panel,graphics,ui});
+    display ||= createViewportDisplay();
+    environment ||= createViewportEnvironments(viewport,{...environmentOptions,display,invalidate:()=>{environmentOptions.invalidate?.();graphicsOptions.invalidate?.();}});
+    if(typeof environment.setGrid==='function')gridContribution=contributeStudioGrid({display,environment,
+      get:()=>environment.gridWanted!==false,set:value=>environment.setGrid(value)});
+    modeUI=mountViewportModes({modes,modeHost,toolHost,ui});
+    graphicsUI=mountViewportSettings({host:panel,environment,display,graphics,ui,...settingsOptions});
     // Dock panels commonly clip descendants. Portal the popup to the document
     // so every control remains reachable even in a small or resized viewport.
     document.body.append(panel);
@@ -230,10 +290,10 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     document.addEventListener('scroll',position,{capture:true,signal});
     if(globalThis.ResizeObserver){observer=new ResizeObserver(position);observer.observe(toggle);observer.observe(root);}
     offDispose=viewport.onDispose?.(dispose)??(()=>{});
-  }catch(error){abort.abort();observer?.disconnect();restorePanel();modeUI?.dispose();graphicsUI?.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();throw error;}
+  }catch(error){abort.abort();observer?.disconnect();restorePanel();modeUI?.dispose();graphicsUI?.dispose();gridContribution?.dispose();if(ownEnvironment)environment?.dispose();if(ownDisplay)display?.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();throw error;}
   function dispose(){
     if(disposed)return;disposed=true;offDispose();abort.abort();observer?.disconnect();restorePanel();
-    modeUI.dispose();graphicsUI.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();
+    modeUI.dispose();graphicsUI.dispose();gridContribution?.dispose();if(ownEnvironment)environment.dispose();if(ownDisplay)display.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();
   }
-  return {modes,graphics,dispose};
+  return {modes,graphics,display,environment,settings:graphicsUI,dispose};
 }
