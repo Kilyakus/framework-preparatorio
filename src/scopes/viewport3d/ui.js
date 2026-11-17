@@ -2,69 +2,144 @@ import {createViewportModes,mountViewportModes} from './modes.js';
 import {createViewportGraphics} from './graphics.js';
 
 /** Shared, composable chrome. Host-specific scene and commands occupy their own slots. */
-export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><span class="v3d-title">3D Просмотр</span><div class="v3d-mode-host" data-v3d-mode-host></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Настройки графики" aria-expanded="false" aria-haspopup="true" title="Графика">⚙ <span>Графика</span></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
+export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><div class="v3d-mode-host" data-v3d-mode-host></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Настройки графики" aria-expanded="false" aria-haspopup="true" title="Графика">⚙ <span>Графика</span></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
 export const VIEWPORT3D_TOOLS_TEMPLATE = `<div class="v3d-tools" data-v3d-tool-host></div>`;
 export const VIEWPORT3D_TEMPLATE = `<section class="v3d-scope" data-viewport3d-scope aria-label="3D Просмотр">${VIEWPORT3D_HEADER_TEMPLATE}<div class="v3d-stage"><div class="v3d-container" data-viewport3d-container></div>${VIEWPORT3D_TOOLS_TEMPLATE}</div></section>`;
 
 const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
   <div class="v3d-graphics-heading"><strong>Графика</strong><button type="button" data-v3d-reset title="Восстановить настройки графики">Сбросить</button></div>
   <details open><summary>Кадр и производительность</summary>
-    <label class="v3d-range"><span>Масштаб разрешения</span><output data-v3d-output="renderScale"></output><input data-v3d-setting="renderScale" type="range" min="0.5" max="2" step="0.05"></label>
-    <label class="v3d-range"><span>Предел плотности экрана</span><output data-v3d-output="maxPixelRatio"></output><input data-v3d-setting="maxPixelRatio" type="range" min="0.5" max="3" step="0.1"></label>
+    <label class="range-row"><span>Масштаб разрешения</span><output data-v3d-output="renderScale"></output><input data-v3d-setting="renderScale" type="range" min="0.5" max="2" step="0.05"></label>
+    <label class="range-row"><span>Предел плотности экрана</span><output data-v3d-output="maxPixelRatio"></output><input data-v3d-setting="maxPixelRatio" type="range" min="0.5" max="3" step="0.1"></label>
     <p class="v3d-info" data-v3d-resolution-info></p>
     <label class="v3d-check"><input data-v3d-setting="adaptiveResolution" type="checkbox"> Адаптивное разрешение</label>
-    <label class="v3d-field"><span>Целевая частота</span><select data-v3d-setting="adaptiveTarget"><option value="30">30 FPS</option><option value="45">45 FPS</option><option value="60">60 FPS</option></select></label>
+    <div class="v3d-field"><span>Целевая частота</span><div data-v3d-select-slot="adaptiveTarget"></div></div>
     <p class="v3d-info">Под нагрузкой масштаб снижается и постепенно восстанавливается. На паузах и в скрытой вкладке замеры не учитываются.</p>
     <p class="v3d-info" data-v3d-context-info></p>
   </details>
   <details open><summary>Цвет и тон</summary>
-    <label class="v3d-range"><span>Экспозиция</span><output data-v3d-output="exposure"></output><input data-v3d-setting="exposure" type="range" min="0.2" max="3" step="0.01"></label>
-    <label class="v3d-field"><span>Тональное отображение</span><select data-v3d-setting="toneMapping"><option value="none">Без тональной компрессии</option><option value="linear">Линейное</option><option value="reinhard">Reinhard</option><option value="cineon">Cineon</option><option value="aces">ACES Filmic</option><option value="agx">AgX</option><option value="neutral">Neutral</option></select></label>
-    <label class="v3d-field"><span>Цветовое пространство вывода</span><select data-v3d-setting="colorSpace"><option value="srgb">sRGB</option><option value="linear">Линейное sRGB</option></select></label>
+    <label class="range-row"><span>Экспозиция</span><output data-v3d-output="exposure"></output><input data-v3d-setting="exposure" type="range" min="0.2" max="3" step="0.01"></label>
+    <div class="v3d-field"><span>Тональное отображение</span><div data-v3d-select-slot="toneMapping"></div></div>
+    <div class="v3d-field"><span>Цветовое пространство вывода</span><div data-v3d-select-slot="colorSpace"></div></div>
     <p class="v3d-info">Без тонального отображения экспозиция может не влиять на материалы. Линейный вывод предназначен для специальных рабочих процессов.</p>
   </details>
   <details open><summary>Тени</summary>
-    <label class="v3d-field"><span>Качество теней</span><select data-v3d-setting="shadow"><option value="auto">Автоматически</option><option value="off">Отключены</option><option value="512">Очень низкое · 512²</option><option value="1024">Низкое · 1024²</option><option value="2048">Среднее · 2048²</option><option value="4096">Высокое · 4096²</option><option value="8192">Ультра · 8192²</option></select></label>
+    <div class="v3d-field"><span>Качество теней</span><div data-v3d-select-slot="shadow"></div></div>
     <p class="v3d-info" data-v3d-shadow-info></p>
-    <label class="v3d-field"><span>Фильтр теней</span><select data-v3d-setting="shadowType"><option value="basic">Жёсткий</option><option value="pcf">PCF</option><option value="soft">Мягкий PCF</option><option value="vsm">VSM</option></select></label>
+    <div class="v3d-field"><span>Фильтр теней</span><div data-v3d-select-slot="shadowType"></div></div>
     <p class="v3d-info" data-v3d-shadow-type-info></p>
     <label class="v3d-check"><input data-v3d-setting="shadowAdjust" type="checkbox"> Ручная коррекция теней</label>
-    <label class="v3d-range"><span>Смещение глубины</span><output data-v3d-output="shadowBias"></output><input data-v3d-setting="shadowBias" type="range" min="-0.01" max="0.01" step="0.00005"></label>
-    <label class="v3d-range"><span>Смещение по нормали</span><output data-v3d-output="shadowNormalBias"></output><input data-v3d-setting="shadowNormalBias" type="range" min="0" max="0.1" step="0.0005"></label>
-    <label class="v3d-range"><span>Радиус фильтра</span><output data-v3d-output="shadowRadius"></output><input data-v3d-setting="shadowRadius" type="range" min="0" max="8" step="0.1"></label>
+    <label class="range-row"><span>Смещение глубины</span><output data-v3d-output="shadowBias"></output><input data-v3d-setting="shadowBias" type="range" min="-0.01" max="0.01" step="0.00005"></label>
+    <label class="range-row"><span>Смещение по нормали</span><output data-v3d-output="shadowNormalBias"></output><input data-v3d-setting="shadowNormalBias" type="range" min="0" max="0.1" step="0.0005"></label>
+    <label class="range-row"><span>Радиус фильтра</span><output data-v3d-output="shadowRadius"></output><input data-v3d-setting="shadowRadius" type="range" min="0" max="8" step="0.1"></label>
     <p class="v3d-info">Радиус зависит от выбранного фильтра; мягкий PCF в Three.js не использует этот параметр. Лимит устройства может уменьшить выбранный размер.</p>
   </details>
   <details><summary>Текстуры и камера</summary>
-    <label class="v3d-field"><span>Анизотропная фильтрация</span><select data-v3d-setting="anisotropy"><option value="source">Как в материале</option><option value="1">1×</option><option value="2">2×</option><option value="4">4×</option><option value="8">8×</option><option value="16">16×</option></select></label>
+    <div class="v3d-field"><span>Анизотропная фильтрация</span><div data-v3d-select-slot="anisotropy"></div></div>
     <p class="v3d-info" data-v3d-texture-info></p>
-    <label class="v3d-range"><span>Угол обзора камеры</span><output data-v3d-output="cameraFov"></output><input data-v3d-setting="cameraFov" type="range" min="15" max="100" step="1"></label>
+    <label class="range-row"><span>Угол обзора камеры</span><output data-v3d-output="cameraFov"></output><input data-v3d-setting="cameraFov" type="range" min="15" max="100" step="1"></label>
     <p class="v3d-info" data-v3d-camera-info></p>
   </details>
 </div>`;
 const ranges={renderScale:v=>`${Math.round(v*100)}%`,maxPixelRatio:v=>`${v.toFixed(1)}×`,exposure:v=>v.toFixed(2),shadowBias:v=>v.toFixed(5),shadowNormalBias:v=>v.toFixed(4),shadowRadius:v=>v.toFixed(1),cameraFov:v=>`${Math.round(v)}°`};
 
-/** Render the same real controls in a popup or any host-specific settings slot. */
-export function mountViewportGraphics({host,graphics,legacyIds=false}={}) {
+// Options and descriptions are data, not HTML: the Preparatorio component
+// renders their text safely and displays the descriptions in its portal menu.
+const GRAPHICS_SELECTS = Object.freeze({
+  adaptiveTarget:{label:'Целевая частота',options:[
+    {value:'30',label:'30 FPS',description:'Меньше нагрузка и энергопотребление.'},
+    {value:'45',label:'45 FPS',description:'Компромисс между плавностью и нагрузкой.'},
+    {value:'60',label:'60 FPS',description:'Более плавное движение при достаточной производительности.'},
+  ]},
+  toneMapping:{label:'Тональное отображение',options:[
+    {value:'none',label:'Без тональной компрессии',description:'Прямой вывод яркости без сжатия диапазона.'},
+    {value:'linear',label:'Линейное',description:'Простое линейное преобразование яркости.'},
+    {value:'reinhard',label:'Reinhard',description:'Мягко сжимает яркие участки.'},
+    {value:'cineon',label:'Cineon',description:'Кинематографическая кривая с контрастом.'},
+    {value:'aces',label:'ACES Filmic',description:'Кинематографическое сжатие светов.'},
+    {value:'agx',label:'AgX',description:'Сохраняет оттенки в ярких областях.'},
+    {value:'neutral',label:'Neutral',description:'Нейтральное отображение цветов материалов.'},
+  ]},
+  colorSpace:{label:'Цветовое пространство вывода',options:[
+    {value:'srgb',label:'sRGB',description:'Стандартный вывод для экранов.'},
+    {value:'linear',label:'Линейное sRGB',description:'Для специальных линейных рабочих процессов.'},
+  ]},
+  shadow:{label:'Качество теней',options:[
+    {value:'auto',label:'Автоматически',description:'Размер карты выбирается приложением.'},
+    {value:'off',label:'Отключены',description:'Не рассчитывать тени от источников света.'},
+    {value:'512',label:'Очень низкое · 512²',description:'Минимальная нагрузка и детализация.'},
+    {value:'1024',label:'Низкое · 1024²',description:'Небольшая карта теней.'},
+    {value:'2048',label:'Среднее · 2048²',description:'Баланс детализации и производительности.'},
+    {value:'4096',label:'Высокое · 4096²',description:'Больше деталей, выше расход памяти.'},
+    {value:'8192',label:'Ультра · 8192²',description:'Максимальная детализация при поддержке устройства.'},
+  ]},
+  shadowType:{label:'Фильтр теней',options:[
+    {value:'basic',label:'Жёсткий',description:'Чёткие границы без сглаживания.'},
+    {value:'pcf',label:'PCF',description:'Сглаживание краёв выборками карты теней.'},
+    {value:'soft',label:'Мягкий PCF',description:'Мягкий фильтр в поддерживаемых версиях Three.js.'},
+    {value:'vsm',label:'VSM',description:'Вариационная карта с регулируемым размытием.'},
+  ]},
+  anisotropy:{label:'Анизотропная фильтрация',options:[
+    {value:'source',label:'Как в материале',description:'Сохранять настройки каждой текстуры.'},
+    {value:'1',label:'1×',description:'Минимальная фильтрация под острыми углами.'},
+    {value:'2',label:'2×',description:'Небольшое повышение чёткости.'},
+    {value:'4',label:'4×',description:'Умеренное повышение чёткости.'},
+    {value:'8',label:'8×',description:'Высокая чёткость наклонных текстур.'},
+    {value:'16',label:'16×',description:'Максимум при поддержке устройства.'},
+  ]},
+});
+
+/** Render the same Preparatorio controls in a popup or a host settings slot. */
+export function mountViewportGraphics({host,graphics,legacyIds=false,ui}={}) {
   if(!host?.ownerDocument||!graphics)throw new TypeError('viewport graphics slot and controller are required');
+  if(typeof ui?.createCustomSelect!=='function'||typeof ui?.syncRangeFill!=='function')
+    throw new TypeError('viewport graphics require createCustomSelect and syncRangeFill from uix-preparatorio');
   const doc=host.ownerDocument, wrapper=doc.createElement('div');wrapper.innerHTML=GRAPHICS_TEMPLATE;
   const root=wrapper.firstElementChild;host.append(root);
-  const abort=new AbortController(),signal=abort.signal,inputs=[...root.querySelectorAll('[data-v3d-setting]')];
-  const inputFor=name=>root.querySelector(`[data-v3d-setting="${name}"]`);
+  const abort=new AbortController(),signal=abort.signal,inputs=[...root.querySelectorAll('input[data-v3d-setting]')];
+  const inputFor=name=>root.querySelector(`input[data-v3d-setting="${name}"]`);
+  const selectors=new Map(), signatures=new Map(), disabledStates=new Map();
+  let off=()=>{},observer=null,disposed=false;
+  const dispose=()=>{if(disposed)return;disposed=true;off();abort.abort();observer?.disconnect();
+    for(const selector of selectors.values())selector.destroy();selectors.clear();root.remove();};
+  try {
+  for(const [name,definition] of Object.entries(GRAPHICS_SELECTS)){
+    const selector=ui.createCustomSelect({label:definition.label,options:definition.options,onChange(value){
+      const next=name==='adaptiveTarget'?Number(value):value;
+      if(!graphics.set({[name]:next}))sync(graphics.snapshot());
+    }});
+    selectors.set(name,selector);
+    selector.trigger.dataset.v3dSetting=name;
+    selector.menu.dataset.v3dGraphicsSelect=name;
+    root.querySelector(`[data-v3d-select-slot="${name}"]`).append(selector.element);
+  }
   if(legacyIds){
-    for(const [key,id] of Object.entries({shadow:'displayShadow',exposure:'displayExposure',adaptiveResolution:'displayAdaptive'}))inputFor(key).id=id;
+    selectors.get('shadow').trigger.id='displayShadow';
+    for(const [key,id] of Object.entries({exposure:'displayExposure',adaptiveResolution:'displayAdaptive'}))inputFor(key).id=id;
     root.querySelector('[data-v3d-shadow-info]').id='displayShadowInfo';root.querySelector('[data-v3d-output="exposure"]').id='displayExposureValue';
   }
   function sync(state){
-    const v=state.settings;
+    const v=state.settings,hasShadow=state.shadows.length>0;
     for(const input of inputs){const key=input.dataset.v3dSetting;if(input.type==='checkbox')input.checked=!!v[key];else input.value=String(v[key]);
+      if(input.type==='range')ui.syncRangeFill(input);
       const output=root.querySelector(`[data-v3d-output="${key}"]`);if(output)output.value=output.textContent=ranges[key]?.(v[key])??String(v[key]);}
-    for(const [name,supported] of [['toneMapping',state.supportedToneMappings],['shadowType',state.supportedShadowTypes],['colorSpace',state.supportedColorSpaces]])
-      for(const option of inputFor(name).options)option.disabled=!supported.includes(option.value);
-    inputFor('adaptiveTarget').disabled=!v.adaptiveResolution;
-    const hasShadow=state.shadows.length>0;
-    inputFor('shadow').disabled=!hasShadow;
-    for(const option of inputFor('shadow').options)option.disabled=/^\d+$/.test(option.value)&&Number(option.value)<state.limits.shadowMin;
-    inputFor('shadowType').disabled=!hasShadow||v.shadow==='off';
+    for(const [name,definition] of Object.entries(GRAPHICS_SELECTS)){
+      const supported={toneMapping:state.supportedToneMappings,shadowType:state.supportedShadowTypes,colorSpace:state.supportedColorSpaces}[name];
+      const options=definition.options.map(option=>{
+        const belowMinimum=name==='shadow'&&/^\d+$/.test(option.value)&&Number(option.value)<state.limits.shadowMin;
+        const unsupported=supported&&!supported.includes(option.value);
+        // Keep a legacy saved low value visible until the user replaces it.
+        const disabled=!!unsupported||(belowMinimum&&option.value!==String(v[name]));
+        const note=unsupported?' Недоступно в этой версии Three.js.':belowMinimum?` Минимальный размер приложения: ${state.limits.shadowMin}².`:'';
+        return {...option,disabled,description:option.description+note};
+      });
+      const selector=selectors.get(name),signature=JSON.stringify(options);
+      if(signature!==signatures.get(name)){signatures.set(name,signature);selector.setOptions(options);}
+      if(selector.value!==String(v[name]))selector.setValue(String(v[name]));
+      const disabled=(name==='adaptiveTarget'&&!v.adaptiveResolution)||(name==='shadow'&&!hasShadow)||(name==='shadowType'&&(!hasShadow||v.shadow==='off'));
+      if(disabledStates.get(name)!==disabled){disabledStates.set(name,disabled);selector.setDisabled(disabled);}
+      selector.trigger.value=String(v[name]);
+    }
     root.querySelector('[data-v3d-shadow-type-info]').textContent=state.supportedShadowTypes.includes('soft')?'':'Мягкий PCF недоступен в этой версии Three.js; используйте PCF.';
     inputFor('shadowAdjust').disabled=!hasShadow||v.shadow==='off';
     for(const key of ['shadowBias','shadowNormalBias','shadowRadius'])inputFor(key).disabled=!hasShadow||v.shadow==='off'||!v.shadowAdjust||(key==='shadowRadius'&&v.shadowType==='soft');
@@ -80,18 +155,28 @@ export function mountViewportGraphics({host,graphics,legacyIds=false}={}) {
   for(const input of inputs){
     const event=input.type==='range'?'input':'change';
     input.addEventListener(event,()=>{
-      const value=input.type==='checkbox'?input.checked:input.type==='range'||input.dataset.v3dSetting==='adaptiveTarget'?Number(input.value):input.value;
-      graphics.set({[input.dataset.v3dSetting]:value});
+      const value=input.type==='checkbox'?input.checked:Number(input.value);
+      if(!graphics.set({[input.dataset.v3dSetting]:value}))sync(graphics.snapshot());
     },{signal});
   }
   root.querySelector('[data-v3d-reset]').addEventListener('click',()=>graphics.reset(),{signal});
-  const off=graphics.subscribe(sync);
-  return {root,dispose(){off();abort.abort();root.remove();}};
+  off=graphics.subscribe(sync,{immediate:false});sync(graphics.snapshot());
+  const Observer=doc.defaultView?.ResizeObserver;
+  observer=Observer?new Observer(()=>{
+    for(const selector of selectors.values())if(!selector.trigger.isConnected||!selector.trigger.getClientRects().length)selector.close();
+  }):null;
+  observer?.observe(root);
+  return {root,
+    containsPopup:target=>[...selectors.values()].some(selector=>selector.menu.contains(target)),
+    closeSelects:()=>{for(const selector of selectors.values())selector.close();},dispose};
+  } catch(error){dispose();throw error;}
 }
 
 /** Wire common slots. Hosts can provide existing mode/graphics controllers. */
-export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},modes=null,graphics=null}={}) {
+export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},modes=null,graphics=null,ui}={}) {
   if(!root?.querySelector||!viewport)throw new TypeError('viewport chrome requires root and viewport');
+  if(typeof ui?.createCustomSelect!=='function'||typeof ui?.syncRangeFill!=='function')
+    throw new TypeError('viewport chrome requires createCustomSelect and syncRangeFill from uix-preparatorio');
   const modeHost=root.querySelector('[data-v3d-mode-host]'),toolHost=root.querySelector('[data-v3d-tool-host]');
   const panel=root.querySelector('[data-v3d-graphics-panel]'),toggle=root.querySelector('[data-v3d-graphics-toggle]');
   if(!modeHost||!toolHost||!panel||!toggle)throw new Error('viewport chrome slots are missing');
@@ -106,11 +191,15 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     if(originalParent)originalParent.insertBefore(panel,originalNext?.parentNode===originalParent?originalNext:null);
   };
   try{
-    modeUI=mountViewportModes({modes,modeHost,toolHost});graphicsUI=mountViewportGraphics({host:panel,graphics});
+    modeUI=mountViewportModes({modes,modeHost,toolHost,ui});graphicsUI=mountViewportGraphics({host:panel,graphics,ui});
     // Dock panels commonly clip descendants. Portal the popup to the document
     // so every control remains reachable even in a small or resized viewport.
     document.body.append(panel);
-    const close=()=>{panel.hidden=true;toggle.setAttribute('aria-expanded','false');};
+    // Once portaled, absolute top:100% would briefly place it below the
+    // document on the first opening. Measure it invisibly at a fixed position
+    // before revealing it, so neither users nor hit testing see that jump.
+    panel.style.position='fixed';panel.style.top='0px';panel.style.left='0px';panel.style.right='auto';
+    const close=()=>{graphicsUI.closeSelects();panel.hidden=true;panel.style.visibility='';toggle.setAttribute('aria-expanded','false');};
     const position=()=>{
       if(panel.hidden)return;
       const win=document.defaultView,anchor=toggle.getBoundingClientRect(),margin=8,gap=5;
@@ -126,9 +215,17 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
       const top=placeBelow?anchor.bottom+gap:anchor.top-gap-height;
       panel.style.top=`${Math.max(margin,Math.min(top,win.innerHeight-height-margin))}px`;
     };
-    toggle.addEventListener('click',()=>{panel.hidden=!panel.hidden;toggle.setAttribute('aria-expanded',String(!panel.hidden));position();},{signal});
-    document.addEventListener('pointerdown',event=>{if(!panel.hidden&&!panel.contains(event.target)&&!toggle.contains(event.target))close();},{signal});
-    document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!panel.hidden){close();toggle.focus();}},{signal});
+    toggle.addEventListener('click',()=>{
+      if(!panel.hidden){close();return;}
+      panel.style.visibility='hidden';panel.hidden=false;toggle.setAttribute('aria-expanded','true');position();
+      if(!panel.hidden)panel.style.visibility='';
+    },{signal});
+    document.addEventListener('pointerdown',event=>{
+      if(!panel.hidden&&!panel.contains(event.target)&&!toggle.contains(event.target)&&!graphicsUI.containsPopup(event.target))close();
+    },{signal});
+    // The custom select handles its own Escape first. Do not also close the
+    // surrounding graphics panel until the next Escape.
+    document.addEventListener('keydown',event=>{if(!event.defaultPrevented&&event.key==='Escape'&&!panel.hidden){close();toggle.focus();}},{signal});
     document.defaultView?.addEventListener('resize',position,{signal});
     document.addEventListener('scroll',position,{capture:true,signal});
     if(globalThis.ResizeObserver){observer=new ResizeObserver(position);observer.observe(toggle);observer.observe(root);}

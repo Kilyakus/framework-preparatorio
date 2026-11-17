@@ -6,6 +6,9 @@
 
 ```js
 import * as THREE from 'three';
+import {createCustomSelect, syncRangeFill} from 'uix-preparatorio';
+import 'uix-preparatorio/styles.css';
+import 'framework-preparatorio/scopes/viewport3d/styles.css';
 import {createScopeRegistry, registerScopeDefinitions, mountScopeNodes} from 'framework-preparatorio';
 
 const registry = createScopeRegistry();
@@ -16,20 +19,20 @@ mountScopeNodes(registry, document);
 const node = document.querySelector('[data-viewport3d-scope]');
 const dispose = registry.get('viewport3d').activate({
   node,
-  viewport3d: {THREE, plugins: [], onReady(viewport) {
+  viewport3d: {THREE, ui: {createCustomSelect, syncRangeFill}, plugins: [], onReady(viewport) {
     viewport.camera.position.z = 4;
   }},
 });
 // Позже: dispose();
 ```
 
-Импортируйте CSS и задайте размер контейнера в приложении:
+Для готового интерфейса нужны `uix-preparatorio` **2.0.3 или новее** и оба
+CSS из примера. Хост передаёт `ui` явно, поэтому без DOM библиотека интерфейса
+не импортируется автоматически; голые runtime и контроллеры по-прежнему могут
+использоваться без неё. Приложение должно задать размер контейнера.
 
-```js
-import 'framework-preparatorio/scopes/viewport3d/styles.css';
-```
-
-Встроенная область содержит шапку «3D Просмотр», базовый режим «Просмотр»,
+Встроенная область содержит панель управления без повторного названия вкладки,
+базовый режим «Просмотр»,
 инструмент «Обзор», управление камерой и панель «Графика». При `loop: false`
 изменения навигации, графики и размера запрашивают одиночный кадр; либо передайте
 `loop: (viewport, time) => { /* обновление и viewport.render() */ }`. При
@@ -80,11 +83,15 @@ viewport.start(() => viewport.render(), {driver: 'renderer'});
 
 Можно встроить общие контроллеры в существующее приложение, не заменяя его
 сцену и разметку. `VIEWPORT3D_HEADER_TEMPLATE` и `VIEWPORT3D_TOOLS_TEMPLATE`
-дают готовые слоты, `mountViewportChrome({root, viewport, modeOptions,
-graphicsOptions})` их заполняет. Панель графики переносится в `document.body`,
-чтобы не обрезаться границами дока; она прокручивается и закрывается по Escape
-или нажатию снаружи. `chrome.dispose()` возвращает узел на место и снимает
-обработчики; `viewport.dispose()` вызывает эту очистку автоматически.
+дают готовые слоты, `mountViewportChrome({root, viewport, ui: {createCustomSelect,
+syncRangeFill}, modeOptions, graphicsOptions})` их заполняет. Селект режима и
+выпадающие настройки — настоящие компоненты Preparatorio с описаниями вариантов;
+ползунки используют библиотечные `.range-row` и `syncRangeFill` при вводе,
+программной синхронизации и сбросе. Панель графики и её выпадающие меню
+переносятся в `document.body`, чтобы не обрезаться границами дока. Escape сначала
+закрывает вложенный список, следующий Escape — панель. `chrome.dispose()`
+возвращает панель на место и снимает обработчики; `viewport.dispose()` вызывает
+эту очистку автоматически.
 
 `createViewportModes` не зависит от DOM. Единственный встроенный режим —
 `view` («Просмотр») с единственным инструментом `orbit` («Обзор»). Дескрипторы
@@ -95,7 +102,11 @@ graphicsOptions})` их заполняет. Панель графики пере
 режим помнит свой последний инструмент в течение сеанса. `setMode`, `setTool`,
 `setAvailable` и `removeMode` проверяют доступность; базовый `view` нельзя
 удалить или выключить. `onModeChange`/`onToolChange` могут вернуть `false`,
-чтобы отклонить переход. Для отдельной разметки есть `mountViewportModes`.
+чтобы отклонить переход. Для отдельной разметки есть
+`mountViewportModes({modes, modeHost, toolHost, ui: {createCustomSelect}})`.
+Он возвращает `select` — кнопку-combobox (не нативный `<select>`),
+`selectController` — контроллер Preparatorio и `dispose()`. Для смены режима
+используйте `modes.setMode()`, а не установку DOM `value` и событие `change`.
 Сохранение выбора и реальные действия инструментов остаются у хоста.
 
 Если у приложения уже есть управление камерой, используйте его; иначе
@@ -139,9 +150,15 @@ MSAA и другие параметры контекста показывают�
 с `setQuality(size|null)`, `snapshot()`, опциональными `minSize` и
 `resetAdjust()`. Для временно скрытых исходных материалов передайте
 `additionalMaterials: () => iterable`: при смене теней/тона обновятся и они.
-`mountViewportGraphics({host, graphics})` встраивает те же поля в свой контейнер;
-`legacyIds: true` оставляет ID старых контролов Morphia. Контроллер не владеет
-геометрией, светом или материалами: `dispose()` снимает подписки и возвращает
+`mountViewportGraphics({host, graphics, ui: {createCustomSelect, syncRangeFill}})`
+встраивает те же поля в свой контейнер; `legacyIds: true` оставляет ID старых
+контролов Morphia, но `displayShadow` теперь указывает на кнопку-combobox, а не
+на `<select>`. При собственной внешней панели используйте `containsPopup(target)`
+для проверки вложенного портала и `closeSelects()` при закрытии панели; для
+события `click` учитывайте `event.composedPath()`, поскольку библиотека может
+уже удалить выбранный пункт из DOM. Вызов `dispose()` у возвращённого UI удаляет
+его селекты и порталы. Контроллер графики не владеет геометрией, светом или
+материалами: `dispose()` снимает подписки и возвращает
 переопределённую анизотропию, но не уничтожает сцену и не откатывает настройки
 рендерера. Ресурсами по-прежнему управляет создавший их хост.
 

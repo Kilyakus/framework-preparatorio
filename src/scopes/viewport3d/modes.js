@@ -67,23 +67,26 @@ export function createViewportModes({ modes = [], tools = [], initialMode = 'vie
   });
 }
 
-/** Attach the common mode selector and vertical tool rail to host-provided slots. */
-export function mountViewportModes({modes, modeHost, toolHost, selectId = ''} = {}) {
+/** Attach the Preparatorio selector and vertical tool rail to host-provided slots. */
+export function mountViewportModes({modes, modeHost, toolHost, selectId = '', ui} = {}) {
   if (!modes || !modeHost?.ownerDocument || !toolHost?.ownerDocument) throw new TypeError('viewport mode slots are required');
+  if (typeof ui?.createCustomSelect !== 'function') throw new TypeError('viewport modes require ui.createCustomSelect from uix-preparatorio');
   const doc=modeHost.ownerDocument, abort=new AbortController(), signal=abort.signal;
-  const select=doc.createElement('select');select.className='v3d-mode-select';select.setAttribute('aria-label','Режим просмотра');
-  if(selectId)select.id=selectId;modeHost.append(select);
+  const selector=ui.createCustomSelect({label:'Режим просмотра', options:[], onChange(value){
+    if(!modes.setMode(value)) selector.setValue(modes.value.mode);
+    selector.trigger.value=modes.value.mode;
+  }});
+  const select=selector.trigger;selector.element.classList.add('v3d-mode-select');
+  if(selectId)select.id=selectId;modeHost.append(selector.element);
   toolHost.setAttribute('role','toolbar');toolHost.setAttribute('aria-label','Инструменты просмотра');toolHost.setAttribute('aria-orientation','vertical');
   toolHost.classList.add('v3d-tools');
   const buttons=new Map();let signature='';
   function sync(state) {
-    const next=state.modes.map(item=>`${item.id}:${item.label}:${item.available}`).join('|');
-    if(next!==signature){
-      signature=next;select.replaceChildren(...state.modes.map(item=>{
-        const option=doc.createElement('option');option.value=item.id;option.textContent=item.label;option.disabled=!item.available;
-        if(item.description)option.title=item.description;return option;
-      }));
-    }
+    const options=state.modes.map(item=>({value:item.id,label:item.label,description:item.description||'',disabled:!item.available}));
+    const next=JSON.stringify(options);
+    if(next!==signature){signature=next;selector.setOptions(options);}
+    if(selector.value!==state.mode)selector.setValue(state.mode);
+    // Keep the legacy button ID useful to hosts without introducing a hidden native select.
     select.value=state.mode;
     const visible=new Set(state.tools.map(item=>item.id));
     for(const item of state.tools){
@@ -107,7 +110,15 @@ export function mountViewportModes({modes, modeHost, toolHost, selectId = ''} = 
     for(const [id,button] of buttons){button.hidden=!visible.has(id);const active=!button.hidden&&id===state.tool;
       button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));button.tabIndex=active?0:-1;}
   }
-  select.addEventListener('change',()=>{if(!modes.setMode(select.value))select.value=modes.value.mode;},{signal});
-  const off=modes.subscribe(sync);
-  return {select,dispose(){off();abort.abort();select.remove();for(const button of buttons.values())button.remove();buttons.clear();}};
+  let off=()=>{},observer=null,disposed=false;
+  const dispose=()=>{if(disposed)return;disposed=true;off();abort.abort();observer?.disconnect();selector.destroy();for(const button of buttons.values())button.remove();buttons.clear();};
+  try {
+    off=modes.subscribe(sync,{immediate:false});sync(modes.value);
+    // Dock tab switches can hide a selector without a pointer event. Avoid a
+    // floating portal when its anchor becomes hidden or is detached.
+    const Observer=doc.defaultView?.ResizeObserver;
+    observer=Observer?new Observer(()=>{if(!select.isConnected||!select.getClientRects().length)selector.close();}):null;
+    observer?.observe(modeHost);
+    return {select,selectController:selector,dispose};
+  } catch(error){dispose();throw error;}
 }

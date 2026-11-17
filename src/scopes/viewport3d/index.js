@@ -59,7 +59,7 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
         if(typeof globalThis.requestAnimationFrame==='function')redrawFrame=requestAnimationFrame(()=>{redrawFrame=null;if(!viewport.disposed)viewport.render();});
         else viewport.render();
       };
-      chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,
+      chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,ui:config.ui,
         graphicsOptions:{...config.graphicsOptions,invalidate}});
       // A resized drawing buffer is cleared even when the pixel ratio is
       // unchanged, so a demand-rendered viewport must request a fresh frame.

@@ -53,8 +53,10 @@ Three.js хоста и предоставляет управление сцен�
 `VIEWPORT3D_TOOLS_TEMPLATE`, `createViewportModes`, `mountViewportModes`,
 `createViewportGraphics`, `mountViewportGraphics`, `mountViewportChrome` и
 `createViewportOrbit`; стили импортируются отдельно из
-`framework-preparatorio/scopes/viewport3d/styles.css`. В каркасе встроены только
-режим `view` и инструмент `orbit`. Расширения, сохранение и специфичная сцена
+`framework-preparatorio/scopes/viewport3d/styles.css`. Для готового UI хост
+передаёт `ui: {createCustomSelect, syncRangeFill}` из `uix-preparatorio` 2.0.3+
+и подключает его CSS; отдельные DOM-free контроллеры и runtime этого не требуют.
+В каркасе встроены только режим `view` и инструмент `orbit`. Расширения, сохранение и специфичная сцена
 предоставляются приложением. Подпуть `framework-preparatorio/scopes/viewport3d`;
 полный контракт и примеры —
 [`../src/scopes/viewport3d/README.md`](../src/scopes/viewport3d/README.md).
