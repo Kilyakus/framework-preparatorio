@@ -37,6 +37,7 @@
     "./browser": "./src/browser.js",
     "./scopes": "./src/scopes/index.js",
     "./scopes/viewport3d": "./src/scopes/viewport3d/index.js",
+    "./scopes/viewport3d/styles.css": "./src/scopes/viewport3d/styles.css",
     "./contributions": "./src/contributions/view-contributions.js",
     "./menu": "./src/menu/index.js",
     "./topbar": "./src/topbar/index.js",
@@ -61,5 +62,5 @@
   "engines": {
     "node": ">=20"
   },
-  "sideEffects": false
+  "sideEffects": ["**/*.css"]
 }

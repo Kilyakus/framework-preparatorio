@@ -75,6 +75,7 @@ export function createViewport3D(options = {}) {
   const plugins = new Map(), active = new Map(), scopes = new Set(options.scopes ?? []);
   const apis = Object.assign(Object.create(null), options.apis ?? {});
   const beforeResize = new Set(), afterResize = new Set();
+  const beforeRender = new Set(), afterRender = new Set(), disposeHooks = new Set();
   let disposed = false, reconciling = false, observer = null, windowResize = null;
   let loop = null, frame = null, loopDriver = null, loopGeneration = 0;
   const scopeAccess = Object.freeze({has:id => scopes.has(id), list:() => [...scopes]});
@@ -240,10 +241,20 @@ export function createViewport3D(options = {}) {
     }
     return stop;
   }
+  function onRender(fn,{phase='after'} = {}) {
+    checkLive(); if (typeof fn !== 'function' || !['before','after'].includes(phase)) throw new TypeError('Invalid render hook');
+    const hooks=phase==='before'?beforeRender:afterRender; hooks.add(fn); return ()=>hooks.delete(fn);
+  }
   const viewport = Object.freeze({
     id:VIEWPORT3D_ID, THREE, container, scene, camera, renderer, canvas:element,
-    render(renderScene=scene,renderCamera=camera) {checkLive(); renderer.render(renderScene,renderCamera);},
-    resize, observeResize, disconnectResize, onResize, start, stop,
+    render(renderScene=scene,renderCamera=camera) {
+      checkLive();const event={viewport,scene:renderScene,camera:renderCamera};
+      for(const fn of [...beforeRender])fn(event);
+      renderer.render(renderScene,renderCamera);
+      for(const fn of [...afterRender])fn(event);
+    },
+    resize, observeResize, disconnectResize, onResize, onRender, start, stop,
+    onDispose(fn) {checkLive();if(typeof fn!=='function')throw new TypeError('Invalid dispose hook');disposeHooks.add(fn);return ()=>disposeHooks.delete(fn);},
     registerPlugin(plugin) {return registerPlugins([plugin]);}, registerPlugins,
     unregisterPlugin(id) {checkLive(); if(!plugins.has(id))return false; plugins.delete(id); reconcile(); return true;},
     setApi, setScopeAvailable,
@@ -253,8 +264,10 @@ export function createViewport3D(options = {}) {
     get disposed() {return disposed;},
     dispose() {
       if (disposed) return; disposed=true; stop(); disconnectResize();
+      for (const cleanup of [...disposeHooks].reverse()) try { cleanup(); } catch(error) { warn(error); }
+      disposeHooks.clear();
       for (const id of [...active.keys()].reverse()) deactivate(id);
-      plugins.clear(); beforeResize.clear(); afterResize.clear();
+      plugins.clear(); beforeResize.clear(); afterResize.clear(); beforeRender.clear(); afterRender.clear();
       if (ownsRenderer) try { renderer.dispose?.(); } catch(error) { warn(error); }
       if (appended) element?.remove?.();
     },

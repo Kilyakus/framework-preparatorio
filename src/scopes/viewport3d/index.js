@@ -1,27 +1,26 @@
 /** Optional, host-configured 3D scope. No Three.js copy is imported here. */
 import { createViewport3D, VIEWPORT3D_ID } from './runtime.js';
+import { VIEWPORT3D_TEMPLATE, mountViewportChrome } from './ui.js';
+import { createViewportOrbit } from './orbit.js';
 
 export { createViewport3D, VIEWPORT3D_ID } from './runtime.js';
+export { VIEWPORT3D_VIEW_MODE, VIEWPORT3D_ORBIT_TOOL, createViewportModes, mountViewportModes } from './modes.js';
+export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics.js';
+export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportChrome } from './ui.js';
+export { createViewportOrbit } from './orbit.js';
 
-/** The fallback shell is only registered when the host explicitly opts in. */
+/** The scope remains opt-in, but its navigation and graphics ship by default. */
 export const VIEWPORT3D_SCOPE = Object.freeze({
   id: VIEWPORT3D_ID,
   areaId: 'viewport3d',
-  label: '3D-просмотр',
+  label: '3D Просмотр',
   selector: '[data-viewport3d-scope]',
   hideable: true,
   tools: Object.freeze([]),
-  template: '<section data-viewport3d-scope><div data-viewport3d-container></div></section>',
+  template: VIEWPORT3D_TEMPLATE,
 });
 
-/**
- * Create an enabled scope, optionally extending its shell with host metadata.
- * With no configuration, no scope is returned and nothing can be mounted.
- * A host-provided scope is still bound through the ordinary scope registry.
- *
- * @param {{enabled?:boolean, scope?:object}} config
- * @returns {object|null}
- */
+/** Explicit opt-in; an application can override metadata or extend the shell. */
 export function createViewport3DScope({ enabled = false, scope = {} } = {}) {
   if (enabled !== true) return null;
   if (!scope || typeof scope !== 'object' || Array.isArray(scope))
@@ -32,15 +31,16 @@ export function createViewport3DScope({ enabled = false, scope = {} } = {}) {
 }
 
 /**
- * Default activation for the generic shell. Projects can bind their own scope
- * implementation instead, retaining their markup, controls and plugins.
- * The context carries `viewport3d: {THREE, options?, plugins?, onReady?, loop?}`.
- * The returned cleanup also exposes `.viewport3d` for the host.
+ * Built-in scope, including camera navigation and graphics controls. A custom
+ * shell can bind its own activate and reuse the same chrome/controllers. With
+ * `loop:false`, interactions redraw once rather than starting another loop.
  */
 export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) {
   if (!node?.querySelector) throw new TypeError('viewport3d scope requires its root node');
   const container = config.options?.container ?? node.querySelector('[data-viewport3d-container]');
   const viewport = createViewport3D({ ...config.options, THREE: config.THREE, container });
+  let chrome=null,orbit=null,redrawFrame=null;
+  const cancelRedraw=()=>{if(redrawFrame!=null)globalThis.cancelAnimationFrame?.(redrawFrame);redrawFrame=null;};
   try {
     viewport.onResize(({ width, height }) => {
       if (viewport.camera.isPerspectiveCamera) {
@@ -51,13 +51,35 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
     viewport.registerPlugins(config.plugins ?? []);
     viewport.observeResize({ window: true });
     config.onReady?.(viewport);
+    // Old custom minimal shells and non-DOM test hosts remain supported.
+    if(node.ownerDocument && node.querySelector('[data-v3d-mode-host]')) {
+      const invalidate=()=>{
+        config.graphicsOptions?.invalidate?.();config.invalidate?.();
+        if(config.loop!==false||viewport.disposed||redrawFrame!=null)return;
+        if(typeof globalThis.requestAnimationFrame==='function')redrawFrame=requestAnimationFrame(()=>{redrawFrame=null;if(!viewport.disposed)viewport.render();});
+        else viewport.render();
+      };
+      chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,
+        graphicsOptions:{...config.graphicsOptions,invalidate}});
+      // A resized drawing buffer is cleared even when the pixel ratio is
+      // unchanged, so a demand-rendered viewport must request a fresh frame.
+      viewport.onResize(invalidate);
+      if(config.orbit!==false){
+        const options=config.orbitOptions??{};
+        orbit=createViewportOrbit(viewport,{...options,
+          isEnabled:()=>chrome.modes.value.tool==='orbit'&&(options.isEnabled?.()??true),
+          onChange:()=>{options.onChange?.();invalidate();}});
+        viewport.onDispose(()=>{cancelRedraw();orbit?.dispose();orbit=null;});
+      } else viewport.onDispose(cancelRedraw);
+    }
     if (config.loop !== false)
       viewport.start(typeof config.loop === 'function' ? time => config.loop(viewport, time) : () => viewport.render());
   } catch (error) {
-    viewport.dispose();
+    cancelRedraw();orbit?.dispose();chrome?.dispose();viewport.dispose();
     throw error;
   }
-  const dispose = () => viewport.dispose();
+  const dispose = () => {cancelRedraw();orbit?.dispose();orbit=null;chrome?.dispose();chrome=null;viewport.dispose();};
   dispose.viewport3d = viewport;
+  Object.defineProperties(dispose,{graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},orbit:{get:()=>orbit}});
   return dispose;
 }

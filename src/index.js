@@ -16,6 +16,22 @@ export {
   VIEWPORT3D_SCOPE,
   createViewport3DScope,
   activateViewport3DScope,
+  VIEWPORT3D_VIEW_MODE,
+  VIEWPORT3D_ORBIT_TOOL,
+  createViewportModes,
+  mountViewportModes,
+  VIEWPORT3D_GRAPHICS_DEFAULTS,
+  normalizeViewportGraphics,
+  viewportHardwareLimits,
+  createAdaptiveResolution,
+  createViewportGraphics,
+  setViewportShadowMapEnabled,
+  VIEWPORT3D_HEADER_TEMPLATE,
+  VIEWPORT3D_TOOLS_TEMPLATE,
+  VIEWPORT3D_TEMPLATE,
+  mountViewportGraphics,
+  mountViewportChrome,
+  createViewportOrbit,
 } from "./scopes/viewport3d/index.js";
 
 export {
