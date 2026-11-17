@@ -12,6 +12,7 @@
  * памяти находятся только паспорта.
  */
 import { createScopeOrder } from "./order.js";
+import { createViewport3DScope, VIEWPORT3D_ID } from "../scopes/viewport3d/index.js";
 import {
   registerViewContribution,
   registerViewportContribution,
@@ -43,15 +44,32 @@ export function availablePluginScopes(pluginScopes, engines) {
  *
  * @returns {{engines: object[], scopes: object[]}}
  */
-export function registerScopeDefinitions(registry, { engines = [], pluginScopes = [], preferred = [], engineOrder = [] } = {}) {
+export function registerScopeDefinitions(registry, { engines = [], pluginScopes = [], preferred = [], engineOrder = [], builtInScopes = {} } = {}) {
   if (!registry || typeof registry.register !== "function") throw new TypeError("registerScopeDefinitions: нужен реестр областей");
   const sorted = sortEngines(engines, engineOrder);
   const order = createScopeOrder(preferred);
-  for (const scope of availablePluginScopes(pluginScopes, sorted).sort(order.compare)) registry.register(scope);
+  const configured = Object.hasOwn(builtInScopes, VIEWPORT3D_ID);
+  const viewportConfig = builtInScopes[VIEWPORT3D_ID] ?? {};
+  let viewportRegistered = false;
+  function register(scope) {
+    if (scope.id === VIEWPORT3D_ID && configured) {
+      // The explicit opt-in also controls a host's extended shell. Omitting
+      // the setting preserves legacy application-defined scopes; it never
+      // registers the new built-in scope on its own.
+      if (viewportConfig.enabled !== true) return;
+      viewportRegistered = true;
+      registry.register(createViewport3DScope({ enabled: true, scope: { ...viewportConfig.scope, ...scope } }));
+      return;
+    }
+    registry.register(scope);
+  }
+  for (const scope of availablePluginScopes(pluginScopes, sorted).sort(order.compare)) register(scope);
   for (const engine of sorted) {
     const definitions = contributionsOf(engine).scopeDefinitions ?? engine.scopeDefinitions ?? [];
-    for (const scope of [...definitions].sort(order.compare)) registry.register(scope);
+    for (const scope of [...definitions].sort(order.compare)) register(scope);
   }
+  if (viewportConfig.enabled === true && !viewportRegistered)
+    registry.register(createViewport3DScope(viewportConfig));
   return { engines: sorted, scopes: registry.list() };
 }
 

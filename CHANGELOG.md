@@ -3,6 +3,12 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.2.0]
+
+- Добавлена необязательная область `src/scopes/viewport3d` и host-injected 3D-runtime.
+- Встроенная область не регистрируется без `builtInScopes.viewport3d.enabled: true`.
+- Расширения используют зависимости по scopes/API и управляют своими ресурсами.
+
 ## [1.1.0] — 2026-11-11
 
 Каркас дополнен правилами, которые до этого дублировались в Rephlexia Studio:

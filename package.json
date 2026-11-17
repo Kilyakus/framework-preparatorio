@@ -1,6 +1,6 @@
 {
   "name": "framework-preparatorio",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Каркас интерфейса редактора на областях (scope): реестр областей, связывание паспорта с реализацией, доступность элементов управления, меню тулбара и справка из вкладов областей, загрузка каталога областей, сборка приложения из движков",
   "type": "module",
   "license": "MIT",
@@ -36,6 +36,7 @@
     ".": "./src/index.js",
     "./browser": "./src/browser.js",
     "./scopes": "./src/scopes/index.js",
+    "./scopes/viewport3d": "./src/scopes/viewport3d/index.js",
     "./contributions": "./src/contributions/view-contributions.js",
     "./menu": "./src/menu/index.js",
     "./topbar": "./src/topbar/index.js",

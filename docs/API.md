@@ -42,6 +42,16 @@
 - [Оболочка (браузер)](#оболочка-браузер)
 - [Типы данных](#типы-данных)
 
+## Необязательный viewport3d
+
+`createViewport3DScope({enabled, scope})` возвращает паспорт и реализацию только
+при явном `enabled: true`. `registerScopeDefinitions` принимает
+`builtInScopes: {viewport3d: {enabled: true}}`; без конфигурации встроенная
+область не добавляется. `createViewport3D({THREE, ...options})` принимает
+Three.js хоста и предоставляет управление сценой, рендерером и плагинами.
+Подпуть `framework-preparatorio/scopes/viewport3d`; полный контракт и пример —
+[`../src/scopes/viewport3d/README.md`](../src/scopes/viewport3d/README.md).
+
 ## Реестр областей
 
 ### createScopeRegistry

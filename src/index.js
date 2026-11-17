@@ -11,6 +11,14 @@
  * `uix-preparatorio`.
  */
 export {
+  createViewport3D,
+  VIEWPORT3D_ID,
+  VIEWPORT3D_SCOPE,
+  createViewport3DScope,
+  activateViewport3DScope,
+} from "./scopes/viewport3d/index.js";
+
+export {
   createScopeRegistry,
   mountScopeNodes,
   useScopeRegistry,
