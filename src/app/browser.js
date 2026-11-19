@@ -5,9 +5,9 @@
  * сборка) без установки библиотеки интерфейса: `/menu` и `/shell` требуют
  * `uix-preparatorio`, остальные подпути — нет.
  */
-export * from "./index.js";
-export { initMenuContributions, initViewMenu, initViewportMenu } from "./menu/index.js";
-export { initCollapsibleSections, installVirtualDockSizing, installCompactDockSizing, createToolCatalogue } from "./shell/index.js";
+export * from "./main.js";
+export { initMenuContributions, initViewMenu, initViewportMenu } from "../studio/menu/index.js";
+export { initCollapsibleSections, installVirtualDockSizing, installCompactDockSizing, createToolCatalogue } from "../studio/shell/index.js";
 export {
   validateTopbarMenus,
   validateTopbarSections,
@@ -15,6 +15,6 @@ export {
   toMenuSpec,
   topbarActions,
   helpMenuSpec,
-} from "./topbar/index.js";
-export { validateHelp, collectHelpTopics, mountHelp } from "./help/index.js";
-export { createScopeLoader, versionedModuleUrl, importScopeUrl } from "./runtime/index.js";
+} from "../studio/topbar/index.js";
+export { validateHelp, collectHelpTopics, mountHelp } from "../studio/help/index.js";
+export { createScopeLoader, versionedModuleUrl, importScopeUrl } from "../studio/runtime/index.js";

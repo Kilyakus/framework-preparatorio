@@ -1,4 +1,4 @@
-import {createGridFloorClass} from './grid-floor.js';
+import {createGridFloorClass} from '../../studio/scopes/viewport3d/grid-floor.js';
 
 /** The one reserved environment shipped with viewport3d itself. */
 export const BASE_MAP_ID = 'studio';

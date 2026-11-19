@@ -14,7 +14,7 @@
 
 ## [1.2.0]
 
-- Добавлена необязательная область `src/scopes/viewport3d` и host-injected 3D-runtime.
+- Добавлена необязательная область `src/studio/scopes/viewport3d` и host-injected 3D-runtime.
 - Встроенная область не регистрируется без `builtInScopes.viewport3d.enabled: true`.
 - Расширения используют зависимости по scopes/API и управляют своими ресурсами.
 - Добавлены общий режим `view` с инструментом `orbit`, расширяемый контроллер

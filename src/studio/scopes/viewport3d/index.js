@@ -1,15 +1,15 @@
 /** Optional, host-configured 3D scope. No Three.js copy is imported here. */
-import { createViewport3D, VIEWPORT3D_ID } from './runtime.js';
+import { createViewport3D, VIEWPORT3D_ID } from '../../../app/engine/viewport3d/runtime.js';
 import { VIEWPORT3D_TEMPLATE, mountViewportChrome } from './ui.js';
 import { createViewportOrbit } from './orbit.js';
 
-export { createViewport3D, VIEWPORT3D_ID } from './runtime.js';
+export { createViewport3D, VIEWPORT3D_ID } from '../../../app/engine/viewport3d/runtime.js';
 export { VIEWPORT3D_VIEW_MODE, VIEWPORT3D_ORBIT_TOOL, createViewportModes, mountViewportModes } from './modes.js';
 export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics.js';
 export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui.js';
 export { mountViewportSection } from './sections.js';
 export { createViewportDisplay, mountViewportDisplay, contributeStudioGrid } from './display.js';
-export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studioMap, BUILTIN_VIEWPORT_ENVIRONMENTS } from './studio.js';
+export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studioMap, BUILTIN_VIEWPORT_ENVIRONMENTS } from '../../../plugins/worlds/studio.js';
 export { createGridFloorClass } from './grid-floor.js';
 export { normalizeViewportEnvironment, discoverViewportEnvironments, createViewportEnvironments, mountViewportEnvironment } from './environments.js';
 export { createViewportOrbit } from './orbit.js';

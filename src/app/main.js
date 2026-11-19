@@ -32,7 +32,7 @@ export {
   mountViewportGraphics,
   mountViewportChrome,
   createViewportOrbit,
-} from "./scopes/viewport3d/index.js";
+} from "../studio/scopes/viewport3d/index.js";
 
 export {
   createScopeRegistry,
@@ -45,7 +45,7 @@ export {
   bindScopes,
   createScopeAvailability,
   bindScopeDependencies,
-} from "./scopes/index.js";
+} from "../studio/scopes/index.js";
 
 export {
   registerViewContribution,
@@ -61,7 +61,7 @@ export {
   createViewportContributionRegistry,
   normalizeMenuContribution,
   normalizeViewContribution,
-} from "./contributions/view-contributions.js";
+} from "../studio/contributions/view-contributions.js";
 
 export {
   createScopeOrder,

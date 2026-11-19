@@ -12,11 +12,11 @@
  * памяти находятся только паспорта.
  */
 import { createScopeOrder } from "./order.js";
-import { createViewport3DScope, VIEWPORT3D_ID } from "../scopes/viewport3d/index.js";
+import { createViewport3DScope, VIEWPORT3D_ID } from "../../studio/scopes/viewport3d/index.js";
 import {
   registerViewContribution,
   registerViewportContribution,
-} from "../contributions/view-contributions.js";
+} from "../../studio/contributions/view-contributions.js";
 
 const contributionsOf = (owner) => owner?.plugins ?? owner ?? {};
 

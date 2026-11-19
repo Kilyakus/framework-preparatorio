@@ -1,4 +1,4 @@
-import {BASE_MAP_ID,BUILTIN_VIEWPORT_ENVIRONMENTS,createBaseMapGrid,isBaseMap,studioMap} from './studio.js';
+import {BASE_MAP_ID,BUILTIN_VIEWPORT_ENVIRONMENTS,createBaseMapGrid,isBaseMap,studioMap} from '../../../plugins/worlds/studio.js';
 import {mountViewportSection} from './sections.js';
 
 const ID=/^[a-z0-9][a-z0-9._-]*$/i;
