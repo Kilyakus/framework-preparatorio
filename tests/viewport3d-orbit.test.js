@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createViewportOrbit} from '../src/studio/scopes/viewport3d/orbit.js';
+import {createViewportOrbit} from '../src/studio/scopes/viewport3d/index.js';
 
 // Minimal injected Three-like vectors keep the framework free of a Three.js
 // runtime dependency; the real renderer and pointer input are also exercised

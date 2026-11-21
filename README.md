@@ -63,7 +63,7 @@ Three.js, переданный хостом, и поддерживает пла�
 встраивать и в собственную разметку; режимы персонажа и предметы сцены остаются
 расширениями приложений. Для UI хост передаёт `createCustomSelect` и `syncRangeFill`
 из `uix-preparatorio` 2.0.3+ и подключает стили обеих библиотек. Подробный контракт:
-[`src/studio/scopes/viewport3d/README.md`](src/scopes/viewport3d/README.md).
+[`src/studio/scopes/viewport3d/README.md`](src/studio/scopes/viewport3d/README.md).
 
 ## Требования
 

@@ -23,3 +23,15 @@
 .v3d-field-label{margin-bottom:4px;color:#a8aeb7;font-size:10px}.v3d-map-options{display:flex;flex-wrap:wrap;gap:4px}.v3d-map-option{padding:4px 7px;border:1px solid #191919;border-radius:3px;background:#343a44;color:#ddd;font:inherit;cursor:pointer}
 .v3d-map-option[aria-pressed=true]{background:#405c83;border-color:#668abd;color:#fff}.v3d-map-option:disabled{opacity:.55;cursor:wait}.v3d-environment-extra:empty{display:none}
 .v3d-graphics .v3d-section{margin:4px 0}.v3d-graphics .v3d-section-body>details:first-child{border-top:0}.v3d-renderer-info{overflow-wrap:anywhere}.v3d-retry-gpu[hidden]{display:none!important}
+
+/* Camera commands and Morphia's orientation rose. */
+.v3d-navigation{display:flex;align-items:center;flex:none;gap:1px}
+.v3d-navigation button{display:grid;place-items:center;min-width:24px;height:26px;padding:2px 4px;border:0;background:transparent;color:#d8dce3;font:12px system-ui,sans-serif;cursor:pointer}
+.v3d-navigation button:hover{background:#3b424d}.v3d-navigation button:focus-visible,.b-gizmo-center:focus-visible{outline:1px solid #94baff;outline-offset:1px}
+.v3d-navigation svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.v3d-stage:fullscreen{width:100vw;height:100vh}
+.b-nav-gizmo{position:absolute;top:10px;right:12px;z-index:12;width:68px;height:68px;pointer-events:none}
+.b-gizmo-axis{position:absolute;left:0;top:0;display:flex;align-items:center;justify-content:center;width:15px;height:15px;padding:0;border:1px solid rgba(0,0,0,.55);border-radius:50%;background:var(--gizmo-axis-color,#6a6a6a);color:#101010;pointer-events:auto;transition:filter .12s,opacity .12s;cursor:pointer}
+.b-gizmo-axis svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.b-gizmo-axis.is-behind{opacity:.42}.b-gizmo-axis:hover{filter:brightness(1.25)}.b-gizmo-axis:focus-visible{outline:1px solid #94baff;outline-offset:1px}
+.b-gizmo-center{position:absolute;left:50%;top:50%;z-index:40;display:grid;place-items:center;width:14px;height:14px;padding:0;transform:translate(-50%,-50%);border:1px solid #0d0d0d;border-radius:50%;background:#6a6a6a;color:#1a1a1a;pointer-events:auto;cursor:pointer}.b-gizmo-center svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}.b-gizmo-center:hover{background:#8a8a8a}
+body.is-preview .b-nav-gizmo{display:none}

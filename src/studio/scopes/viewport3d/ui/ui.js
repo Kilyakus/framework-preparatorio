@@ -1,13 +1,13 @@
 import {createViewportModes,mountViewportModes} from './modes.js';
-import {createViewportGraphics} from './graphics.js';
+import {createViewportGraphics} from '../graphics/graphics.js';
 import {mountViewportSection} from './sections.js';
 import {createViewportDisplay,mountViewportDisplay,contributeStudioGrid} from './display.js';
-import {createViewportEnvironments,mountViewportEnvironment} from './environments.js';
+import {createViewportEnvironments,mountViewportEnvironment} from '../environment/environments.js';
 
 /** Shared, composable chrome. Host-specific scene and commands occupy their own slots. */
-export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><div class="v3d-mode-host" data-v3d-mode-host></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Настройки графики" aria-expanded="false" aria-haspopup="true" title="Графика">⚙ <span>Графика</span></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
+export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><div class="v3d-mode-host" data-v3d-mode-host></div><div class="v3d-navigation" role="group" aria-label="Управление камерой"><button type="button" data-v3d-zoom-out aria-label="Отдалить" title="Отдалить">−</button><button type="button" data-v3d-zoom-reset aria-label="Восстановить масштаб" title="Восстановить масштаб">100%</button><button type="button" data-v3d-zoom-in aria-label="Приблизить" title="Приблизить">+</button><button type="button" data-v3d-fit aria-label="Вписать сцену" title="Вписать сцену"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6"/><path d="M8 1.5v2 M8 12.5v2 M1.5 8h2 M12.5 8h2"/></svg></button><button type="button" data-v3d-fullscreen aria-label="Полный экран" title="Полный экран"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Настройки графики" aria-expanded="false" aria-haspopup="true" title="Графика">⚙ <span>Графика</span></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
 export const VIEWPORT3D_TOOLS_TEMPLATE = `<div class="v3d-tools" data-v3d-tool-host></div>`;
-export const VIEWPORT3D_TEMPLATE = `<section class="v3d-scope" data-viewport3d-scope aria-label="3D Просмотр">${VIEWPORT3D_HEADER_TEMPLATE}<div class="v3d-stage"><div class="v3d-container" data-viewport3d-container></div>${VIEWPORT3D_TOOLS_TEMPLATE}</div></section>`;
+export const VIEWPORT3D_TEMPLATE = `<section class="v3d-scope" data-viewport3d-scope aria-label="3D Просмотр">${VIEWPORT3D_HEADER_TEMPLATE}<div class="v3d-stage" data-v3d-stage><div class="v3d-container" data-viewport3d-container></div>${VIEWPORT3D_TOOLS_TEMPLATE}<div class="b-nav-gizmo" data-v3d-gizmo aria-label="Ориентация сцены" title="Роза осей: клик по оси ставит ракурс, центр — перспектива"><button type="button" class="b-gizmo-center" data-gizmo-center aria-label="Перспектива" title="Перспектива"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M8 2.6 13.4 5.6 8 8.6 2.6 5.6 8 2.6Z M2.6 5.6v4.8L8 13.4l5.4-3V5.6"/></svg></button></div></div></section>`;
 
 const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
   <details open><summary>Кадр и производительность</summary>

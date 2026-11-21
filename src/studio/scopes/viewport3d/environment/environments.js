@@ -1,5 +1,5 @@
-import {BASE_MAP_ID,BUILTIN_VIEWPORT_ENVIRONMENTS,createBaseMapGrid,isBaseMap,studioMap} from '../../../plugins/worlds/studio.js';
-import {mountViewportSection} from './sections.js';
+import {BASE_MAP_ID,BUILTIN_VIEWPORT_ENVIRONMENTS,createBaseMapGrid,isBaseMap,studioMap} from '../../../../plugins/worlds/studio.js';
+import {mountViewportSection} from '../ui/sections.js';
 
 const ID=/^[a-z0-9][a-z0-9._-]*$/i;
 /** Normalize a plugin descriptor once for all hosts. The Studio id is reserved. */

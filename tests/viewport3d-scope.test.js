@@ -67,3 +67,9 @@ test('generic activation cleans up if plugin setup throws',()=>{
   assert.throws(()=>scope.activate({node:{querySelector:()=>host},viewport3d:{THREE:{...THREE,WebGLRenderer:Tracked},loop:false,plugins:[{id:'bad',activate(){throw Error('bad')}}]}}),/bad/);
   assert.equal(renderer.disposals,1);assert.equal(host.child.removed,true);
 });
+
+test('viewport3d root contains only its public entry file and README', async () => {
+  const { readdir } = await import('node:fs/promises');
+  const entries = await readdir(new URL('../src/studio/scopes/viewport3d/', import.meta.url), { withFileTypes: true });
+  assert.deepEqual(entries.filter(entry => entry.isFile()).map(entry => entry.name).sort(), ['README.md', 'index.js']);
+});

@@ -3,7 +3,7 @@
  * with their own camera controls may use those instead; this never imports a
  * second Three.js copy. Left drag rotates, right drag pans, wheel/pinch zooms.
  */
-export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnabled=()=>true,minDistance=.05,maxDistance=1000}={}) {
+export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnabled=()=>true,minDistance=.05,maxDistance=1000,input=true}={}) {
   const {THREE,camera,canvas}=viewport??{};
   if(!THREE?.Vector3||!camera?.position||!canvas?.addEventListener)throw new TypeError('orbit requires a Three camera and canvas');
   const focus=target?.clone?.()??new THREE.Vector3();
@@ -35,6 +35,7 @@ export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnab
     focus.add(delta);camera.position.add(delta);changed();
   }
   const distance=()=>{const p=[...pointers.values()];return p.length<2?0:Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);};
+  if(input){
   canvas.addEventListener('pointerdown',event=>{
     if(!isEnabled()||(event.pointerType!=='touch'&&event.button!==0&&event.button!==2))return;
     pointers.set(event.pointerId,{x:event.clientX,y:event.clientY,button:event.button});
@@ -60,6 +61,7 @@ export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnab
   },{signal});
   if(!canvas.hasAttribute?.('tabindex'))canvas.tabIndex=0;
   if(!canvas.hasAttribute?.('aria-label'))canvas.setAttribute?.('aria-label','Интерактивная 3D-сцена');
+  }
   camera.lookAt(focus);
-  return {target:focus,rotate,pan,zoom,reset(){focus.copy(initialTarget);camera.position.copy(initialPosition);camera.zoom=initialZoom;changed();},dispose(){abort.abort();pointers.clear();}};
+  return {target:focus,minDistance,maxDistance,rotate,pan,zoom,reset(){focus.copy(initialTarget);camera.position.copy(initialPosition);camera.zoom=initialZoom;changed();},dispose(){abort.abort();pointers.clear();}};
 }

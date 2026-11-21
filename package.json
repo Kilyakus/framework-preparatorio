@@ -62,5 +62,11 @@
   "engines": {
     "node": ">=20"
   },
-  "sideEffects": ["**/*.css"]
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "devDependencies": {
+    "three": "^0.186.1",
+    "jsdom": "^26.1.0"
+  }
 }

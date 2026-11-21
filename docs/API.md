@@ -59,7 +59,7 @@ Three.js хоста и предоставляет управление сцен�
 В каркасе встроены только режим `view` и инструмент `orbit`. Расширения, сохранение и специфичная сцена
 предоставляются приложением. Подпуть `framework-preparatorio/scopes/viewport3d`;
 полный контракт и примеры —
-[`../src/studio/scopes/viewport3d/README.md`](../src/scopes/viewport3d/README.md).
+[`../src/studio/scopes/viewport3d/README.md`](../src/studio/scopes/viewport3d/README.md).
 
 ## Реестр областей
 
