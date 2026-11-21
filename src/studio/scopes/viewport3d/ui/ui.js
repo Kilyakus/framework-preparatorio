@@ -4,6 +4,7 @@ import {mountViewportSection} from './sections.js';
 import {createViewportDisplay,mountViewportDisplay,contributeStudioGrid} from './display.js';
 import {createViewportEnvironments,mountViewportEnvironment} from '../environment/environments.js';
 import {mountViewportContributions} from './contributions.js';
+import {mountViewportClasses} from './classes.js';
 
 /** Shared, composable chrome. Host-specific scene and commands occupy their own slots. */
 export const VIEWPORT3D_HEADER_TEMPLATE = `<header class="v3d-header"><div class="v3d-mode-host" data-v3d-mode-host></div><div class="v3d-navigation" role="group" aria-label="Управление камерой"><button type="button" data-v3d-zoom-out aria-label="Отдалить" title="Отдалить">−</button><button type="button" data-v3d-zoom-reset aria-label="Восстановить масштаб" title="Восстановить масштаб">100%</button><button type="button" data-v3d-zoom-in aria-label="Приблизить" title="Приблизить">+</button><button type="button" data-v3d-fit aria-label="Вписать сцену" title="Вписать сцену"><svg aria-hidden="true" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.6"/><path d="M8 1.5v2 M8 12.5v2 M1.5 8h2 M12.5 8h2"/></svg></button><button type="button" data-v3d-fullscreen aria-label="Полный экран" title="Полный экран"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10"/></svg></button></div><span class="v3d-spacer"></span><div class="v3d-graphics-menu"><button class="v3d-graphics-toggle" type="button" data-v3d-graphics-toggle aria-label="Дополнительные настройки просмотра" aria-expanded="false" aria-haspopup="true" title="Окружение и дополнительные настройки"><svg aria-hidden="true" viewBox="0 0 16 16"><path d="m8 1.8 6 3.1-6 3.1-6-3.1 6-3.1Z M2 7.8l6 3.1 6-3.1 M2 10.7l6 3.1 6-3.1"/></svg></button><div class="v3d-graphics-pop" data-v3d-graphics-panel hidden></div></div></header>`;
@@ -231,7 +232,7 @@ export function mountViewportSettings({host,environment,display,graphics,ui,sect
 let nextViewportMenuId=0;
 
 /** Wire common slots. Hosts can provide existing mode/graphics controllers. */
-export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},environmentOptions={},settingsOptions={},modes=null,graphics=null,environment=null,display=null,ui}={}) {
+export function mountViewportChrome({root,viewport,modeOptions={},graphicsOptions={},environmentOptions={},settingsOptions={},modes=null,graphics=null,environment=null,display=null,classes={},ui}={}) {
   if(!root?.querySelector||!viewport)throw new TypeError('viewport chrome requires root and viewport');
   if(typeof ui?.createCustomSelect!=='function'||typeof ui?.syncRangeFill!=='function')
     throw new TypeError('viewport chrome requires createCustomSelect and syncRangeFill from uix-preparatorio');
@@ -240,10 +241,11 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
   if(!modeHost||!toolHost||!panel||!toggle)throw new Error('viewport chrome slots are missing');
   const ownModes=!modes, ownGraphics=!graphics,ownEnvironment=!environment,ownDisplay=!display;
   modes ||= createViewportModes(modeOptions);graphics ||= createViewportGraphics(viewport,graphicsOptions);
-  let modeUI,graphicsUI,gridContribution,contributionsUI,contributionHost,observer,disposed=false,offDispose=()=>{};
+  let modeUI,graphicsUI,gridContribution,contributionsUI,contributionHost,classUI,observer,disposed=false,offDispose=()=>{};
   const abort=new AbortController(),signal=abort.signal;
   const document=root.ownerDocument,originalParent=panel.parentNode,originalNext=panel.nextSibling,originalStyle=panel.getAttribute('style');
   const originalPanelId=panel.getAttribute('id'),originalControls=toggle.getAttribute('aria-controls');
+  const originalWidth=panel.style.width,originalMaxHeight=panel.style.maxHeight;
   const restorePanel=()=>{
     panel.hidden=true;toggle.setAttribute('aria-expanded','false');
     if(originalPanelId===null)panel.removeAttribute('id');else panel.setAttribute('id',originalPanelId);
@@ -263,6 +265,7 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     contributionHost=document.createElement('div');contributionHost.className='v3d-contributions';
     contributionHost.dataset.v3dContributions='';panel.append(contributionHost);
     contributionsUI=mountViewportContributions({host:contributionHost,root:document});
+    classUI=mountViewportClasses({root,panel,classes});
     // Dock panels commonly clip descendants. Portal the popup to the document
     // so every control remains reachable even in a small or resized viewport.
     document.body.append(panel);
@@ -275,7 +278,11 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
       if(panel.hidden)return;
       const win=document.defaultView,anchor=toggle.getBoundingClientRect(),margin=8,gap=5;
       if(!toggle.isConnected||!toggle.getClientRects().length||anchor.bottom<=0||anchor.top>=win.innerHeight||anchor.right<=0||anchor.left>=win.innerWidth){close();return;}
-      const width=Math.max(1,Math.min(320,win.innerWidth-margin*2));
+      // Let the host stylesheet size the menu; only clamp it to the viewport.
+      // Clear the previous positioning pass first so resize can grow it again.
+      panel.style.width=originalWidth;panel.style.maxHeight=originalMaxHeight;
+      const measured=panel.getBoundingClientRect().width;
+      const width=Math.max(1,Math.min(measured||320,win.innerWidth-margin*2));
       panel.style.position='fixed';panel.style.width=`${width}px`;panel.style.right='auto';
       const below=Math.max(0,win.innerHeight-anchor.bottom-margin-gap),above=Math.max(0,anchor.top-margin-gap);
       const desired=Math.max(1,Math.min(650,panel.scrollHeight,win.innerHeight-margin*2));
@@ -301,10 +308,10 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     document.addEventListener('scroll',position,{capture:true,signal});
     if(globalThis.ResizeObserver){observer=new ResizeObserver(position);observer.observe(toggle);observer.observe(root);}
     offDispose=viewport.onDispose?.(dispose)??(()=>{});
-  }catch(error){abort.abort();observer?.disconnect();contributionsUI?.dispose();contributionHost?.remove();restorePanel();modeUI?.dispose();graphicsUI?.dispose();gridContribution?.dispose();if(ownEnvironment)environment?.dispose();if(ownDisplay)display?.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();throw error;}
+  }catch(error){abort.abort();observer?.disconnect();classUI?.dispose();contributionsUI?.dispose();contributionHost?.remove();restorePanel();modeUI?.dispose();graphicsUI?.dispose();gridContribution?.dispose();if(ownEnvironment)environment?.dispose();if(ownDisplay)display?.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();throw error;}
   function dispose(){
     if(disposed)return;disposed=true;offDispose();abort.abort();observer?.disconnect();restorePanel();
-    contributionsUI?.dispose();contributionHost?.remove();modeUI.dispose();graphicsUI.dispose();gridContribution?.dispose();if(ownEnvironment)environment.dispose();if(ownDisplay)display.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();
+    classUI?.dispose();contributionsUI?.dispose();contributionHost?.remove();modeUI.dispose();graphicsUI.dispose();gridContribution?.dispose();if(ownEnvironment)environment.dispose();if(ownDisplay)display.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();
   }
   return {modes,graphics,display,environment,settings:graphicsUI,contributions:contributionsUI,dispose};
 }

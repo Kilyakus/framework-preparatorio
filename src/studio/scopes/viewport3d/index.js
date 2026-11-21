@@ -10,6 +10,7 @@ export { VIEWPORT3D_VIEW_MODE, VIEWPORT3D_ORBIT_TOOL, createViewportModes, mount
 export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics/graphics.js';
 export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui/ui.js';
 export { mountViewportSection } from './ui/sections.js';
+export { mountViewportClasses } from './ui/classes.js';
 export { createViewportDisplay, mountViewportDisplay, contributeStudioGrid } from './ui/display.js';
 export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studioMap, BUILTIN_VIEWPORT_ENVIRONMENTS } from '../../../plugins/worlds/studio.js';
 export { createGridFloorClass } from './environment/grid-floor.js';
@@ -69,7 +70,7 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
         else viewport.render();
       };
       chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,ui:config.ui,
-        environmentOptions:config.environmentOptions,settingsOptions:config.settingsOptions,
+        environmentOptions:config.environmentOptions,settingsOptions:config.settingsOptions,classes:config.classes,
         graphicsOptions:{...config.graphicsOptions,invalidate}});
       // A resized drawing buffer is cleared even when the pixel ratio is
       // unchanged, so a demand-rendered viewport must request a fresh frame.

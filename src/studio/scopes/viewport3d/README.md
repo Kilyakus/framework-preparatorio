@@ -15,6 +15,38 @@
 Импортируйте API через `framework-preparatorio/scopes/viewport3d`, а не по
 внутренним путям: публичный путь и экспорты не изменились.
 
+
+### Тема и классы приложения
+
+`styles.css` содержит только геометрию и правила, необходимые для работы
+viewport: расположение сцены, слотов и gizmo, скрытие и обработку размеров.
+Цвета, фон, шрифты, рамки, отступы и состояния кнопок определяет приложение.
+Стили popup берутся от хоста даже после его переноса в `document.body`.
+
+При активации встроенной области передайте `viewport3d.classes`, а при отдельном
+монтировании — `mountViewportChrome({..., classes})`. Значение слота — строка
+классов или массив строк. Классы добавляются и к элементам, появившимся позже
+(инструменты, разделы и вклады), затем снимаются при `dispose`; уже имевшиеся
+классы узла сохраняются. Например:
+
+```js
+viewport3d: { THREE, ui, classes: {
+  header: 'b-header b-header-lumino',
+  navigationButton: 'b-header-btn', settingsToggle: 'b-header-btn',
+  settingsPanel: 'b-menu-pop app-viewport-menu',
+  section: 'app-settings-section', tool: 'app-tool',
+} }
+```
+
+Слоты: `scope`, `header`, `modeHost`, `navigation`, `navigationButton`,
+`settingsMenu`, `settingsToggle`, `settingsPanel`, `stage`, `toolHost`, `tool`,
+`gizmo`, `gizmoAxis`, `gizmoCenter`, `section`, `sectionHeading`, `sectionToggle`,
+`sectionActions`, `sectionBody`, `graphics`, `displayItem`, `environmentOption`,
+`contribution`, `contributionTitle`. Встроенная область саму тему не выбирает.
+Если класс приложения скрывает popup через `display:none`, укажите в теме
+правило показа для состояния `:not([hidden])`. Ширина меню задаётся темой;
+каркас лишь ограничивает её размерами окна и позиционирует popup.
+
 ## Включение области
 
 ```js
