@@ -1,10 +1,13 @@
+import {createViewportAmbientOcclusion} from './ambient-occlusion.js';
+import {ViewportDynamicShadowQuality} from './shadow-quality.js';
 /** Renderer settings shared by viewport3d hosts. Three.js is always injected. */
 export const VIEWPORT3D_GRAPHICS_DEFAULTS = Object.freeze({
   exposure:1.08, toneMapping:'aces', colorSpace:'srgb',
   shadow:'auto', shadowType:'pcf', shadowAdjust:false, shadowBias:-0.00015,
   shadowNormalBias:0.005, shadowRadius:1,
   renderScale:1, maxPixelRatio:2, adaptiveResolution:false, adaptiveTarget:60,
-  anisotropy:'source', cameraFov:45,
+  anisotropy:'source', cameraFov:45, cameraFar:0,
+  ao:false, aoStrength:50, aoRadius:1.5, aoHalfRes:false, aoCharacters:false, aoDynamic:false,
 });
 const SHADOWS=['off','auto','512','1024','2048','4096','8192'];
 const TONEMAPS={none:'NoToneMapping',linear:'LinearToneMapping',reinhard:'ReinhardToneMapping',cineon:'CineonToneMapping',aces:'ACESFilmicToneMapping',agx:'AgXToneMapping',neutral:'NeutralToneMapping'};
@@ -33,6 +36,13 @@ export function normalizeViewportGraphics(input={}, defaults=VIEWPORT3D_GRAPHICS
     adaptiveTarget:[30,45,60].includes(Number(input.adaptiveTarget))?Number(input.adaptiveTarget):d.adaptiveTarget,
     anisotropy:oneOf(input.anisotropy,['source','1','2','4','8','16'],d.anisotropy),
     cameraFov:number(input.cameraFov,d.cameraFov,15,100),
+    cameraFar:number(input.cameraFar,d.cameraFar,0,1000000),
+    ao:typeof input.ao==='boolean'?input.ao:d.ao,
+    aoStrength:number(input.aoStrength,d.aoStrength,0,100),
+    aoRadius:number(input.aoRadius,d.aoRadius,.1,10),
+    aoHalfRes:typeof input.aoHalfRes==='boolean'?input.aoHalfRes:d.aoHalfRes,
+    aoCharacters:typeof input.aoCharacters==='boolean'?input.aoCharacters:d.aoCharacters,
+    aoDynamic:typeof input.aoDynamic==='boolean'?input.aoDynamic:d.aoDynamic,
   };
 }
 
@@ -108,10 +118,11 @@ const collectTextures=materials=>{
   for(const material of materials){for(const value of Object.values(material))visit(value);for(const uniform of Object.values(material.uniforms??{}))visit(uniform?.value);}
   return textures;
 };
-function collectShadows(scene){const shadows=[];scene?.traverse?.(object=>{if(object.isLight&&object.castShadow&&object.shadow)shadows.push(object.shadow);});return shadows;}
+function collectShadowLights(scene){const lights=[];scene?.traverse?.(object=>{if(object.isLight&&object.castShadow&&object.shadow)lights.push(object);});return lights;}
+function collectShadows(scene){return collectShadowLights(scene).map(light=>light.shadow);}
 function setShadowSize(shadow,size){
   if(!shadow?.mapSize||shadow.mapSize.x===size&&shadow.mapSize.y===size)return;
-  shadow.mapSize.set?.(size,size);shadow.map?.dispose?.();shadow.map=null;shadow.needsUpdate=true;
+  shadow.mapSize.set?.(size,size);shadow.map?.dispose?.();shadow.map=null;shadow.mapPass?.dispose?.();shadow.mapPass=null;shadow.needsUpdate=true;
 }
 
 /**
@@ -120,7 +131,7 @@ function setShadowSize(shadow,size){
  * `refresh()` is called after a model/world/material replacement. It never owns
  * or disposes the host's scene assets. `dispose()` removes all hooks.
  */
-export function createViewportGraphics(viewport,{settings={},defaults={},onChange=()=>{},invalidate=()=>{},canSample=()=>true,shadowAdapter=null,additionalMaterials=null}={}) {
+export function createViewportGraphics(viewport,{settings={},defaults={},onChange=()=>{},invalidate=()=>{},canSample=()=>true,shadowAdapter=null,additionalMaterials=null,aoOptions=null}={}) {
   if(!viewport?.renderer||!viewport?.THREE)throw new TypeError('viewport graphics requires a viewport');
   const {renderer,THREE,scene,camera}=viewport, limits=viewportHardwareLimits(renderer);
   // The PCFSoft constant remains exported in r186+, but both Three renderers
@@ -150,7 +161,10 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
   const initialDefaults=normalizeSupported(actualDefaults);
   let value=normalizeSupported(settings,initialDefaults), disposed=false, shadows=[], lastQuality=null, lastFrame=0,lastScan=0;
   let effectiveRatio=Number(renderer.getPixelRatio?.())||1;
-  const adaptive=createAdaptiveResolution(),originalTextures=new Map(),originalShadows=new Map(),listeners=new Set();
+  const adaptive=createAdaptiveResolution(), shadowControllers=new Map(),originalTextures=new Map(),originalShadows=new Map(),listeners=new Set();
+  let originalFar=null,lastAppliedFar=null;
+  const aoCompatible=!!aoOptions&&[186,187].includes(revision)&&renderer.capabilities?.isWebGL2===true;
+  const aoPipeline=aoCompatible?createViewportAmbientOcclusion(viewport,{...aoOptions,options:value}):null;
   const ceiling=()=>Math.min(limits.shadowCeiling,Number(shadowAdapter?.snapshot?.()?.ceiling)||Infinity);
   const currentRatio=()=>{
     const device=Math.max(.1,Number(globalThis.devicePixelRatio??globalThis.window?.devicePixelRatio)||1);
@@ -184,7 +198,8 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
       if(texture.anisotropy!==next){texture.anisotropy=next;texture.needsUpdate=true;}}
   }
   function applyShadows({forceQuality=false}={}){
-    const previous=shadows;shadows=collectShadows(scene);
+    const previous=shadows, lights=collectShadowLights(scene);shadows=lights.map(light=>light.shadow);
+    for(const [shadow] of shadowControllers)if(!shadows.includes(shadow))shadowControllers.delete(shadow);
     for(const [shadow] of originalShadows)if(!shadows.includes(shadow))originalShadows.delete(shadow);
     const map=renderer.shadowMap;if(!map)return;
     const enabled=value.shadow!=='off';
@@ -197,10 +212,16 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
     }
     if(enabled){
       if(shadowAdapter?.setQuality){
+        shadowAdapter.setTarget?.(value.adaptiveTarget);
         if(forceQuality||lastQuality!==value.shadow){lastQuality=value.shadow;shadowAdapter.setQuality(value.shadow==='auto'?null:Math.min(Number(value.shadow),ceiling()));}
       } else {
-        const size=value.shadow==='auto'?Math.min(2048,ceiling()):Math.min(Number(value.shadow),ceiling());
-        for(const shadow of shadows)setShadowSize(shadow,size);
+        for(const shadow of shadows){
+          let controller=shadowControllers.get(shadow);
+          if(!controller){const light=lights.find(item=>item.shadow===shadow);const target=light?.target;const position=target?.position?.clone?.();const controls=target?.position?{get target(){return position&&target.getWorldPosition?target.getWorldPosition(position):target.position;}}:null;const maxSize=light?.isPointLight?Math.max(1,ceiling()/4):ceiling();controller=new ViewportDynamicShadowQuality({renderer,light,camera,controls,maxSize,minSize:Math.min(512,maxSize)});shadowControllers.set(shadow,controller);}
+          controller.frameBudget=1000/value.adaptiveTarget;
+          const desired=value.shadow==='auto'?null:Math.min(Number(value.shadow),controller.ceiling);
+          if(forceQuality||controller.manual!==desired)controller.setQuality(desired);
+        }
       }
       applyShadowAdjust();map.needsUpdate=true;
     }
@@ -213,11 +234,15 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
     renderer.toneMappingExposure=value.exposure;
     if(THREE[COLOR_SPACES[value.colorSpace]]!==undefined)renderer.outputColorSpace=THREE[COLOR_SPACES[value.colorSpace]];
     if(camera?.isPerspectiveCamera&&Number.isFinite(value.cameraFov)&&camera.fov!==value.cameraFov){camera.fov=value.cameraFov;camera.updateProjectionMatrix?.();}
-    scale();applyShadows({forceQuality});applyTextures();invalidate();
+    if(camera&&'far' in camera){
+      if(value.cameraFar>0){if(originalFar===null||lastAppliedFar!==null&&camera.far!==lastAppliedFar)originalFar=camera.far;const far=Math.max(value.cameraFar,(Number(camera.near)||0)+.001);if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix?.();}lastAppliedFar=far;}
+      else if(originalFar!==null){if(camera.far===lastAppliedFar){camera.far=originalFar;camera.updateProjectionMatrix?.();}originalFar=null;lastAppliedFar=null;}
+    }
+    aoPipeline?.set(value);scale();applyShadows({forceQuality});applyTextures();invalidate();
   }
   const snapshot=()=>({settings:{...value}, effectivePixelRatio:effectiveRatio,adaptiveScale:adaptive.scale,limits:{...limits,shadowCeiling:ceiling(),shadowMin:Number(shadowAdapter?.minSize)||1},
     shadows:shadows.map(shadow=>({size:shadow.mapSize?.x??0,bias:shadow.bias,normalBias:shadow.normalBias,radius:shadow.radius})),
-    shadowInfo:shadowAdapter?.snapshot?.()??null, perspective:!!camera?.isPerspectiveCamera,
+    shadowInfo:shadowAdapter?.snapshot?.()??shadowControllers.values().next().value?.snapshot()??null, effectiveCameraFar:camera?.far??null, aoSupported:!!aoPipeline&&!!camera?.isPerspectiveCamera, aoActive:!!aoPipeline?.active, perspective:!!camera?.isPerspectiveCamera,
     supportedToneMappings:[...supported.toneMapping],
     supportedShadowTypes:[...supported.shadowType],
     supportedColorSpaces:[...supported.colorSpace],
@@ -235,15 +260,20 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
   function refresh(){if(disposed)return;applyAll();publish('refresh');}
   const offResize=viewport.onResize?.(()=>{scale();publish('resize');})??(()=>{});
   const offBefore=viewport.onRender?.(()=>{
+    // Preserve a host's new clip distance when switching worlds while overriding it.
+    if(value.cameraFar>0&&camera&&camera.far!==lastAppliedFar){originalFar=camera.far;lastAppliedFar=Math.max(value.cameraFar,(Number(camera.near)||0)+.001);camera.far=lastAppliedFar;camera.updateProjectionMatrix?.();}
     // Host auto-quality controllers can refresh bias when a world or map changes.
     if(value.shadowAdjust)applyShadowAdjust();
   },{phase:'before'})??(()=>{});
   const offAfter=viewport.onRender?.(()=>{
     const now=globalThis.performance?.now?.()??Date.now();
-    if(value.adaptiveResolution&&!globalThis.document?.hidden&&canSample()){
-      if(lastFrame){const before=adaptive.scale,after=adaptive.sample((now-lastFrame)/1000,value.adaptiveTarget);if(after!==before){scale();publish('adaptive');}}
+    if((value.adaptiveResolution||(value.shadow==='auto'&&!shadowAdapter?.setQuality))&&!globalThis.document?.hidden&&canSample()){
+      if(lastFrame){const dt=(now-lastFrame)/1000;
+        if(value.adaptiveResolution){const before=adaptive.scale,after=adaptive.sample(dt,value.adaptiveTarget);if(after!==before){scale();publish('adaptive');}}
+        if(value.shadow==='auto'&&!shadowAdapter?.setQuality){let changed=false;for(const controller of shadowControllers.values()){controller.frameBudget=1000/value.adaptiveTarget;const before=controller.size;controller.update(dt);changed||=before!==controller.size;}if(changed){invalidate();publish('adaptive');}}
+      }
       lastFrame=now;
-    } else {lastFrame=0;adaptive.pause();}
+    } else {lastFrame=0;adaptive.pause();for(const controller of shadowControllers.values())controller.update(0);}
     // Detect newly attached/replaced lights and opt-in texture overrides without
     // traversing a large scene every frame. Idle demand-renderers do not spin.
     if(now-lastScan>2000){
@@ -252,15 +282,16 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
       if(value.anisotropy!=='source')applyTextures();
     }
   })??(()=>{});
-  try {applyAll({forceQuality:true});}catch(error){offResize();offBefore();offAfter();throw error;}
+  try {applyAll({forceQuality:true});}catch(error){offResize();offBefore();offAfter();aoPipeline?.dispose();throw error;}
   let offDispose=()=>{};
   const api=Object.freeze({
     get value(){return {...value};}, get defaults(){return {...initialDefaults};}, snapshot, set, refresh,
     reset(){return set(initialDefaults);},
     subscribe(fn,{immediate=true}={}){if(disposed)throw new Error('viewport graphics disposed');listeners.add(fn);if(immediate)fn(snapshot(),'init');return()=>listeners.delete(fn);},
-    dispose(){if(disposed)return;disposed=true;offDispose();offResize();offBefore();offAfter();
+    dispose(){if(disposed)return;disposed=true;offDispose();offResize();offBefore();offAfter();aoPipeline?.dispose();
       for(const [texture,original] of originalTextures)if(texture.anisotropy!==original){texture.anisotropy=original;texture.needsUpdate=true;}
-      originalTextures.clear();originalShadows.clear();listeners.clear();},
+      if(originalFar!==null&&camera){if(camera.far===lastAppliedFar){camera.far=originalFar;camera.updateProjectionMatrix?.();}originalFar=null;}
+      shadowControllers.clear();originalTextures.clear();originalShadows.clear();listeners.clear();},
   });
   offDispose=viewport.onDispose?.(()=>api.dispose())??(()=>{});
   return api;

@@ -76,6 +76,7 @@ export function createViewport3D(options = {}) {
   const apis = Object.assign(Object.create(null), options.apis ?? {});
   const beforeResize = new Set(), afterResize = new Set();
   const beforeRender = new Set(), afterRender = new Set(), disposeHooks = new Set();
+  let renderPipeline = null;
   let disposed = false, reconciling = false, observer = null, windowResize = null;
   let loop = null, frame = null, loopDriver = null, loopGeneration = 0;
   const scopeAccess = Object.freeze({has:id => scopes.has(id), list:() => [...scopes]});
@@ -250,10 +251,11 @@ export function createViewport3D(options = {}) {
     render(renderScene=scene,renderCamera=camera) {
       checkLive();const event={viewport,scene:renderScene,camera:renderCamera};
       for(const fn of [...beforeRender])fn(event);
-      renderer.render(renderScene,renderCamera);
+      if(renderPipeline)renderPipeline(event);else renderer.render(renderScene,renderCamera);
       for(const fn of [...afterRender])fn(event);
     },
     resize, observeResize, disconnectResize, onResize, onRender, start, stop,
+    setRenderPipeline(fn) {checkLive();if(typeof fn!=='function')throw new TypeError('Render pipeline must be a function');if(renderPipeline)throw new Error('Viewport render pipeline already installed');renderPipeline=fn;return ()=>{if(renderPipeline===fn)renderPipeline=null;};},
     onDispose(fn) {checkLive();if(typeof fn!=='function')throw new TypeError('Invalid dispose hook');disposeHooks.add(fn);return ()=>disposeHooks.delete(fn);},
     registerPlugin(plugin) {return registerPlugins([plugin]);}, registerPlugins,
     unregisterPlugin(id) {checkLive(); if(!plugins.has(id))return false; plugins.delete(id); reconcile(); return true;},
@@ -267,7 +269,7 @@ export function createViewport3D(options = {}) {
       for (const cleanup of [...disposeHooks].reverse()) try { cleanup(); } catch(error) { warn(error); }
       disposeHooks.clear();
       for (const id of [...active.keys()].reverse()) deactivate(id);
-      plugins.clear(); beforeResize.clear(); afterResize.clear(); beforeRender.clear(); afterRender.clear();
+      renderPipeline=null; plugins.clear(); beforeResize.clear(); afterResize.clear(); beforeRender.clear(); afterRender.clear();
       if (ownsRenderer) try { renderer.dispose?.(); } catch(error) { warn(error); }
       if (appended) element?.remove?.();
     },

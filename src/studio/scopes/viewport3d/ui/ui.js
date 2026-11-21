@@ -44,14 +44,25 @@ const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
     <label class="range-row"><span>Радиус фильтра</span><output data-v3d-output="shadowRadius"></output><input data-v3d-setting="shadowRadius" type="range" min="0" max="8" step="0.1"></label>
     <p class="v3d-info">Радиус зависит от выбранного фильтра; мягкий PCF в Three.js не использует этот параметр. Лимит устройства может уменьшить выбранный размер.</p>
   </details>
+  <details><summary>Окружающее затенение (AO)</summary>
+    <label class="v3d-check"><input data-v3d-setting="ao" type="checkbox"> Включить AO</label>
+    <label class="range-row"><span>Сила</span><output data-v3d-output="aoStrength"></output><input data-v3d-setting="aoStrength" type="range" min="0" max="100" step="5"></label>
+    <label class="range-row"><span>Радиус, м</span><output data-v3d-output="aoRadius"></output><input data-v3d-setting="aoRadius" type="range" min="0.1" max="10" step="0.1"></label>
+    <label class="v3d-check"><input data-v3d-setting="aoHalfRes" type="checkbox"> Половинное разрешение AO</label>
+    <label class="v3d-check"><input data-v3d-setting="aoDynamic" type="checkbox"> Динамические объекты</label>
+    <label class="v3d-check"><input data-v3d-setting="aoCharacters" type="checkbox"> Персонажи (игрок и NPC)</label>
+    <p class="v3d-info" data-v3d-ao-info></p>
+  </details>
   <details><summary>Текстуры и камера</summary>
     <div class="v3d-field"><span>Анизотропная фильтрация</span><div data-v3d-select-slot="anisotropy"></div></div>
     <p class="v3d-info" data-v3d-texture-info></p>
     <label class="range-row"><span>Угол обзора камеры</span><output data-v3d-output="cameraFov"></output><input data-v3d-setting="cameraFov" type="range" min="15" max="100" step="1"></label>
     <p class="v3d-info" data-v3d-camera-info></p>
+    <label class="v3d-field"><span>Дальность камеры (единицы сцены; 0 — как в приложении)</span><input data-v3d-setting="cameraFar" type="number" min="0" max="1000000" step="0.1"></label>
+    <p class="v3d-info" data-v3d-far-info></p>
   </details>
 </div>`;
-const ranges={renderScale:v=>`${Math.round(v*100)}%`,maxPixelRatio:v=>`${v.toFixed(1)}×`,exposure:v=>v.toFixed(2),shadowBias:v=>v.toFixed(5),shadowNormalBias:v=>v.toFixed(4),shadowRadius:v=>v.toFixed(1),cameraFov:v=>`${Math.round(v)}°`};
+const ranges={renderScale:v=>`${Math.round(v*100)}%`,maxPixelRatio:v=>`${v.toFixed(1)}×`,exposure:v=>v.toFixed(2),shadowBias:v=>v.toFixed(5),shadowNormalBias:v=>v.toFixed(4),shadowRadius:v=>v.toFixed(1),cameraFov:v=>`${Math.round(v)}°`,aoStrength:v=>`${Math.round(v)}%`,aoRadius:v=>`${v.toFixed(1)} м`};
 
 // Options and descriptions are data, not HTML: the Preparatorio component
 // renders their text safely and displays the descriptions in its portal menu.
@@ -75,7 +86,7 @@ const GRAPHICS_SELECTS = Object.freeze({
     {value:'linear',label:'Линейное sRGB',description:'Для специальных линейных рабочих процессов.'},
   ]},
   shadow:{label:'Качество теней',options:[
-    {value:'auto',label:'Автоматически',description:'Размер карты выбирается приложением.'},
+    {value:'auto',label:'Автоматически',description:'Разрешение подстраивается под кадр и нагрузку; при наличии контроллера приложения используются его правила.'},
     {value:'off',label:'Отключены',description:'Не рассчитывать тени от источников света.'},
     {value:'512',label:'Очень низкое · 512²',description:'Минимальная нагрузка и детализация.'},
     {value:'1024',label:'Низкое · 1024²',description:'Небольшая карта теней.'},
@@ -149,7 +160,7 @@ export function mountViewportGraphics({host,graphics,legacyIds=false,ui,sections
       const selector=selectors.get(name),signature=JSON.stringify(options);
       if(signature!==signatures.get(name)){signatures.set(name,signature);selector.setOptions(options);}
       if(selector.value!==String(v[name]))selector.setValue(String(v[name]));
-      const disabled=(name==='adaptiveTarget'&&!v.adaptiveResolution)||(name==='shadow'&&!hasShadow)||(name==='shadowType'&&(!hasShadow||v.shadow==='off'));
+      const disabled=(name==='adaptiveTarget'&&!v.adaptiveResolution&&v.shadow!=='auto')||(name==='shadow'&&!hasShadow)||(name==='shadowType'&&(!hasShadow||v.shadow==='off'));
       if(disabledStates.get(name)!==disabled){disabledStates.set(name,disabled);selector.setDisabled(disabled);}
       selector.trigger.value=String(v[name]);
     }
@@ -157,6 +168,10 @@ export function mountViewportGraphics({host,graphics,legacyIds=false,ui,sections
     inputFor('shadowAdjust').disabled=!hasShadow||v.shadow==='off';
     for(const key of ['shadowBias','shadowNormalBias','shadowRadius'])inputFor(key).disabled=!hasShadow||v.shadow==='off'||!v.shadowAdjust||(key==='shadowRadius'&&v.shadowType==='soft');
     inputFor('cameraFov').disabled=!state.perspective;
+    inputFor('ao').disabled=!state.aoSupported;
+    for(const key of ['aoStrength','aoRadius','aoHalfRes','aoDynamic','aoCharacters'])inputFor(key).disabled=!state.aoSupported||!v.ao;
+    root.querySelector('[data-v3d-ao-info]').textContent=state.aoSupported?'Категории задаются приложением. Непомеченные объекты считаются статичными; скиннованные меши — персонажами. AO нагружает видеокарту.':'AO недоступен: нужны дополнения Three.js r186/r187, WebGL2 и перспективная камера.';
+    root.querySelector('[data-v3d-far-info]').textContent=`Текущая дальность: ${state.effectiveCameraFar??'—'}. Большая дальность снижает точность буфера глубины; 0 возвращает значение приложения.`;
     root.querySelector('[data-v3d-resolution-info]').textContent=`Фактическая плотность: ${state.effectivePixelRatio.toFixed(2)}×${v.adaptiveResolution?` · адаптация ${Math.round(state.adaptiveScale*100)}%`:''}.`;
     const attrs=state.limits.attributes;
     root.querySelector('[data-v3d-context-info]').textContent=attrs?`Сглаживание MSAA: ${attrs.antialias?'включено':'выключено'} · буфер глубины: ${attrs.depth?'есть':'нет'}. Параметры WebGL-контекста задаются при создании окна.`:'Сглаживание и параметры WebGL-контекста задаются при создании окна.';

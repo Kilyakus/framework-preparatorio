@@ -7,6 +7,8 @@ import { mountViewportNavigation } from './camera/navigation.js';
 
 export { createViewport3D, VIEWPORT3D_ID } from '../../../app/engine/viewport3d/runtime.js';
 export { VIEWPORT3D_VIEW_MODE, VIEWPORT3D_ORBIT_TOOL, createViewportModes, mountViewportModes } from './ui/modes.js';
+export { createViewportAmbientOcclusion, setViewportAoCategory } from './graphics/ambient-occlusion.js';
+export { ViewportDynamicShadowQuality, SHADOW_SIZES, hardwareCeiling as viewportShadowHardwareCeiling } from './graphics/shadow-quality.js';
 export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics/graphics.js';
 export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui/ui.js';
 export { mountViewportSection } from './ui/sections.js';
