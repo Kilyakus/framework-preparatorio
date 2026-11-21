@@ -305,7 +305,13 @@ export function mountViewportChrome({root,viewport,modeOptions={},graphicsOption
     // surrounding graphics panel until the next Escape.
     document.addEventListener('keydown',event=>{if(!event.defaultPrevented&&event.key==='Escape'&&!panel.hidden){close();toggle.focus();}},{signal});
     document.defaultView?.addEventListener('resize',position,{signal});
-    document.addEventListener('scroll',position,{capture:true,signal});
+    // Only scrolling the document or an ancestor of the anchor moves it.
+    // In particular, scrolling inside the popup must not remeasure it: clearing
+    // max-height momentarily clamps scrollTop and makes the menu bounce.
+    document.addEventListener('scroll',event=>{
+      const source=event.target;
+      if(source===document||source===document.defaultView||source?.contains?.(toggle))position();
+    },{capture:true,signal});
     if(globalThis.ResizeObserver){observer=new ResizeObserver(position);observer.observe(toggle);observer.observe(root);}
     offDispose=viewport.onDispose?.(dispose)??(()=>{});
   }catch(error){abort.abort();observer?.disconnect();classUI?.dispose();contributionsUI?.dispose();contributionHost?.remove();restorePanel();modeUI?.dispose();graphicsUI?.dispose();gridContribution?.dispose();if(ownEnvironment)environment?.dispose();if(ownDisplay)display?.dispose();if(ownModes)modes.dispose();if(ownGraphics)graphics.dispose();throw error;}
