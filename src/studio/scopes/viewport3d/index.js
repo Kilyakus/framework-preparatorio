@@ -1,6 +1,7 @@
 /** Optional, host-configured 3D scope. No Three.js copy is imported here. */
 import { createViewport3D, VIEWPORT3D_ID } from '../../../app/engine/viewport3d/runtime.js';
 import { VIEWPORT3D_TEMPLATE, mountViewportChrome } from './ui/ui.js';
+import { mountViewportStatus } from './ui/status.js';
 import { createViewportOrbit } from './camera/orbit.js';
 import { mountViewportGizmo } from './camera/gizmo.js';
 import { mountViewportNavigation } from './camera/navigation.js';
@@ -12,6 +13,7 @@ export { ViewportDynamicShadowQuality, SHADOW_SIZES, hardwareCeiling as viewport
 export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics/graphics.js';
 export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui/ui.js';
 export { mountViewportSection } from './ui/sections.js';
+export { VIEWPORT3D_STATUS_DEFAULTS, VIEWPORT3D_STATUS_TEMPLATE, composeViewportStatus, mountViewportStatus } from './ui/status.js';
 export { mountViewportClasses } from './ui/classes.js';
 export { createViewportDisplay, mountViewportDisplay, contributeStudioGrid } from './ui/display.js';
 export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studioMap, BUILTIN_VIEWPORT_ENVIRONMENTS } from '../../../plugins/worlds/studio.js';
@@ -51,7 +53,7 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
   if (!node?.querySelector) throw new TypeError('viewport3d scope requires its root node');
   const container = config.options?.container ?? node.querySelector('[data-viewport3d-container]');
   const viewport = createViewport3D({ ...config.options, THREE: config.THREE, container });
-  let chrome=null,orbit=null,navigation=null,gizmo=null,redrawFrame=null;
+  let chrome=null,orbit=null,navigation=null,gizmo=null,status=null,redrawFrame=null;
   const cancelRedraw=()=>{if(redrawFrame!=null)globalThis.cancelAnimationFrame?.(redrawFrame);redrawFrame=null;};
   try {
     viewport.onResize(({ width, height }) => {
@@ -63,6 +65,8 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
     viewport.registerPlugins(config.plugins ?? []);
     viewport.observeResize({ window: true });
     config.onReady?.(viewport);
+    const statusRoot=node.ownerDocument && node.querySelector('[data-v3d-status]');
+    if(statusRoot && config.status !== false) status=mountViewportStatus({root:statusRoot,viewport,...config.status});
     // Old custom minimal shells and non-DOM test hosts remain supported.
     if(node.ownerDocument && node.querySelector('[data-v3d-mode-host]')) {
       const invalidate=()=>{
@@ -92,11 +96,11 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
     if (config.loop !== false)
       viewport.start(typeof config.loop === 'function' ? time => config.loop(viewport, time) : () => viewport.render());
   } catch (error) {
-    cancelRedraw();gizmo?.dispose();navigation?.dispose();orbit?.dispose();chrome?.dispose();viewport.dispose();
+    cancelRedraw();gizmo?.dispose();navigation?.dispose();orbit?.dispose();chrome?.dispose();status?.dispose();viewport.dispose();
     throw error;
   }
-  const dispose = () => {cancelRedraw();gizmo?.dispose();gizmo=null;navigation?.dispose();navigation=null;orbit?.dispose();orbit=null;chrome?.dispose();chrome=null;viewport.dispose();};
+  const dispose = () => {cancelRedraw();gizmo?.dispose();gizmo=null;navigation?.dispose();navigation=null;orbit?.dispose();orbit=null;chrome?.dispose();chrome=null;status?.dispose();status=null;viewport.dispose();};
   dispose.viewport3d = viewport;
-  Object.defineProperties(dispose,{graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},environment:{get:()=>chrome?.environment??null},display:{get:()=>chrome?.display??null},orbit:{get:()=>config.orbit===false?null:orbit},navigation:{get:()=>navigation}});
+  Object.defineProperties(dispose,{status:{get:()=>status},graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},environment:{get:()=>chrome?.environment??null},display:{get:()=>chrome?.display??null},orbit:{get:()=>config.orbit===false?null:orbit},navigation:{get:()=>navigation}});
   return dispose;
 }

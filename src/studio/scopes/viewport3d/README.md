@@ -339,3 +339,72 @@ MSAA и другие параметры контекста показывают�
 ## Проверки
 
 Из корня пакета: `npm test`. Тесты проверяют включение, исключение, пользовательский паспорт, жизненный цикл, владение рендерером и разрешение зависимостей расширений.
+
+## Строка состояния viewport3d
+
+Штатный шаблон содержит `[data-v3d-status]`; при `activateViewport3DScope`
+компонент подключается автоматически (отключение: `viewport3d.status: false`).
+По умолчанию он выводит FPS **отрисовки данного viewport** и мировые XYZ
+активного Three.js объекта. До первой секунды FPS и без выбора выводится `—`.
+При остановке отрисовки последнее значение FPS сохраняется: это не FPS экрана.
+
+```js
+import { mountViewportStatus } from 'framework-preparatorio/scopes/viewport3d';
+
+// Для штатного scope эти параметры передаются как viewport3d.status:
+const statusConfig = {
+  layers: [projectStatus, appStatus], // базовый проект -> наследник
+  getContext: () => ({ engine }),
+};
+// Для собственной оболочки, как в Morphia:
+const status = mountViewportStatus({
+  root: node.querySelector('[data-v3d-status]'), viewport,
+  ...statusConfig,
+});
+// Передать фактически выбранный объект при смене выбора:
+viewport.setActiveObject(selectedObject ?? null);
+// При изменении данных без отрисовки:
+status.update();
+// При удалении оболочки:
+status.dispose();
+```
+
+Каждый слой — `{groups: [], items: []}`. Элементы и группы объединяются по
+стабильному kebab-case `id`, последующие поля перекрывают предыдущие; порядок
+`layers` задаёт наследование между проектами. `{id, remove:true}` удаляет запись,
+`enabled:false` скрывает её. В одном слое повторный id — ошибка. Три уровня
+размещения: `row` (неотрицательное целое, меньше — выше), `side` (`left` /
+`right`), `order` (меньше — раньше, при равенстве сохраняется порядок
+регистрации). По умолчанию `row:0, side:'left', order:0`.
+
+```js
+const projectStatus = {
+  groups: [{id:'scene', row:0, side:'left', order:20, separator:' · '}],
+  items: [
+    {id:'mode', group:'scene', order:10, text:({engine}) => engine.mode},
+    {id:'object-name', group:'scene', order:20, text:({activeObject}) => activeObject?.name ?? 'Нет выбора'},
+    {id:'help', row:1, side:'left', text:'Колесо — масштаб'},
+  ],
+};
+const appStatus = {items:[{id:'fps', row:1, side:'right', order:10}]};
+const removeExtra = status.addLayer({items:[{id:'extra',group:'scene',order:30,text:'Дополнительно'}]});
+removeExtra();
+```
+
+Сгруппированные элементы следуют вместе; `order` группы задаёт место группы
+в своей стороне строки, `order` элемента — место внутри. `row` и `side`
+элемента, если заданы, переопределяют группу (элемент окажется в другом
+фрагменте группы). Параметры `text`, `title`, `visible` принимают значение
+или функцию от `{viewport, activeObject, fps, ...getContext()}`; `visible:false`
+или пустой `text` скрывают элемент. Текст выводится безопасно, без HTML.
+`getActiveObject` позволяет адаптировать выбор собственного приложения вместо
+`viewport.activeObject`. Без `getWorldPosition` позиция не выдумывается.
+Обновление на кадрах ограничено `interval` мс (по умолчанию 200), второй
+анимационный цикл не создаётся; `dispose()` освобождает подписки и возвращает
+исходное содержимое контейнера. Динамический `addLayer` возвращает функцию
+отмены; слой, необходимый другим слоям, удалить нельзя до удаления зависимостей.
+
+Чтобы перенести унаследованный элемент (например, `fps`) в группу с её
+координатами, сбросьте унаследованное размещение: `{id:'fps', group:'scene',
+row:null, side:null}`. Иначе явно заданные в базовом слое `row` и `side`
+продолжают иметь приоритет над размещением группы.

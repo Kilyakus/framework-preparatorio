@@ -21,3 +21,12 @@
 .b-gizmo-axis svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .b-gizmo-center{position:absolute;left:50%;top:50%;z-index:40;display:grid;place-items:center;width:14px;height:14px;padding:0;transform:translate(-50%,-50%);pointer-events:auto}
 .b-gizmo-center svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linejoin:round}
+/* Shared status layout; colors, type and borders belong to the host theme. */
+.v3d-status{display:flex;flex:0 0 auto;flex-direction:column;min-width:0}
+.v3d-status[hidden]{display:none!important}
+.v3d-status-row{display:flex;align-items:center;justify-content:space-between;min-width:0;gap:8px}
+.v3d-status-side{display:flex;align-items:center;min-width:0;gap:8px;white-space:nowrap;overflow-x:auto;scrollbar-width:thin}
+.v3d-status-right{justify-content:flex-end;flex:none;max-width:60%}
+.v3d-status-left{flex:1 1 auto}
+.v3d-status-group{display:inline-flex;align-items:center;flex:none;white-space:pre}
+.v3d-status-item{flex:none;white-space:pre}

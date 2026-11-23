@@ -3,6 +3,7 @@ const SLOTS=Object.freeze({
   scope:'[data-viewport3d-scope]',header:'.v3d-header',modeHost:'[data-v3d-mode-host]',
   navigation:'.v3d-navigation',navigationButton:'.v3d-navigation button',
   settingsMenu:'.v3d-graphics-menu',settingsToggle:'[data-v3d-graphics-toggle]',settingsPanel:'[data-v3d-graphics-panel]',
+  status:'[data-v3d-status]',statusRow:'.v3d-status-row',statusItem:'.v3d-status-item',statusGroup:'.v3d-status-group',
   stage:'[data-v3d-stage]',toolHost:'[data-v3d-tool-host]',tool:'[data-viewport-tool]',
   gizmo:'.b-nav-gizmo',gizmoAxis:'.b-gizmo-axis',gizmoCenter:'.b-gizmo-center',
   section:'.v3d-section',sectionHeading:'.v3d-section-heading',sectionToggle:'.v3d-section-toggle',

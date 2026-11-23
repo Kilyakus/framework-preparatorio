@@ -75,7 +75,8 @@ export function createViewport3D(options = {}) {
   const plugins = new Map(), active = new Map(), scopes = new Set(options.scopes ?? []);
   const apis = Object.assign(Object.create(null), options.apis ?? {});
   const beforeResize = new Set(), afterResize = new Set();
-  const beforeRender = new Set(), afterRender = new Set(), disposeHooks = new Set();
+  const beforeRender = new Set(), afterRender = new Set(), disposeHooks = new Set(), selectionHooks = new Set();
+  let activeObject = options.activeObject ?? null;
   let renderPipeline = null;
   let disposed = false, reconciling = false, observer = null, windowResize = null;
   let loop = null, frame = null, loopDriver = null, loopGeneration = 0;
@@ -255,6 +256,19 @@ export function createViewport3D(options = {}) {
       for(const fn of [...afterRender])fn(event);
     },
     resize, observeResize, disconnectResize, onResize, onRender, start, stop,
+    get activeObject() { return activeObject; },
+    setActiveObject(object) {
+      checkLive();
+      if (object != null && typeof object !== 'object') throw new TypeError('activeObject must be an object or null');
+      if (object === activeObject) return false;
+      activeObject = object;
+      for (const fn of [...selectionHooks]) fn(object);
+      return true;
+    },
+    onActiveObjectChange(fn) {
+      checkLive(); if (typeof fn !== 'function') throw new TypeError('Invalid selection hook');
+      selectionHooks.add(fn); return () => selectionHooks.delete(fn);
+    },
     setRenderPipeline(fn) {checkLive();if(typeof fn!=='function')throw new TypeError('Render pipeline must be a function');if(renderPipeline)throw new Error('Viewport render pipeline already installed');renderPipeline=fn;return ()=>{if(renderPipeline===fn)renderPipeline=null;};},
     onDispose(fn) {checkLive();if(typeof fn!=='function')throw new TypeError('Invalid dispose hook');disposeHooks.add(fn);return ()=>disposeHooks.delete(fn);},
     registerPlugin(plugin) {return registerPlugins([plugin]);}, registerPlugins,
@@ -269,7 +283,7 @@ export function createViewport3D(options = {}) {
       for (const cleanup of [...disposeHooks].reverse()) try { cleanup(); } catch(error) { warn(error); }
       disposeHooks.clear();
       for (const id of [...active.keys()].reverse()) deactivate(id);
-      renderPipeline=null; plugins.clear(); beforeResize.clear(); afterResize.clear(); beforeRender.clear(); afterRender.clear();
+      renderPipeline=null; activeObject=null; selectionHooks.clear(); plugins.clear(); beforeResize.clear(); afterResize.clear(); beforeRender.clear(); afterRender.clear();
       if (ownsRenderer) try { renderer.dispose?.(); } catch(error) { warn(error); }
       if (appended) element?.remove?.();
     },
