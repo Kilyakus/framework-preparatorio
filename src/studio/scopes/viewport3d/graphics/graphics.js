@@ -8,6 +8,7 @@ export const VIEWPORT3D_GRAPHICS_DEFAULTS = Object.freeze({
   renderScale:1, maxPixelRatio:2, adaptiveResolution:false, adaptiveTarget:60,
   anisotropy:'source', cameraFov:45, cameraFar:0,
   ao:false, aoStrength:50, aoRadius:1.5, aoHalfRes:false, aoCharacters:false, aoDynamic:false,
+  globalLighting:true, globalLightingIntensity:1,
 });
 const SHADOWS=['off','auto','512','1024','2048','4096','8192'];
 const TONEMAPS={none:'NoToneMapping',linear:'LinearToneMapping',reinhard:'ReinhardToneMapping',cineon:'CineonToneMapping',aces:'ACESFilmicToneMapping',agx:'AgXToneMapping',neutral:'NeutralToneMapping'};
@@ -43,6 +44,8 @@ export function normalizeViewportGraphics(input={}, defaults=VIEWPORT3D_GRAPHICS
     aoHalfRes:typeof input.aoHalfRes==='boolean'?input.aoHalfRes:d.aoHalfRes,
     aoCharacters:typeof input.aoCharacters==='boolean'?input.aoCharacters:d.aoCharacters,
     aoDynamic:typeof input.aoDynamic==='boolean'?input.aoDynamic:d.aoDynamic,
+    globalLighting:typeof input.globalLighting==='boolean'?input.globalLighting:d.globalLighting,
+    globalLightingIntensity:number(input.globalLightingIntensity,d.globalLightingIntensity,0,3),
   };
 }
 
@@ -131,7 +134,7 @@ function setShadowSize(shadow,size){
  * `refresh()` is called after a model/world/material replacement. It never owns
  * or disposes the host's scene assets. `dispose()` removes all hooks.
  */
-export function createViewportGraphics(viewport,{settings={},defaults={},onChange=()=>{},invalidate=()=>{},canSample=()=>true,shadowAdapter=null,additionalMaterials=null,aoOptions=null}={}) {
+export function createViewportGraphics(viewport,{settings={},defaults={},onChange=()=>{},invalidate=()=>{},canSample=()=>true,shadowAdapter=null,globalLightingAdapter=null,additionalMaterials=null,aoOptions=null}={}) {
   if(!viewport?.renderer||!viewport?.THREE)throw new TypeError('viewport graphics requires a viewport');
   const {renderer,THREE,scene,camera}=viewport, limits=viewportHardwareLimits(renderer);
   // The PCFSoft constant remains exported in r186+, but both Three renderers
@@ -163,6 +166,11 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
   let effectiveRatio=Number(renderer.getPixelRatio?.())||1;
   const adaptive=createAdaptiveResolution(), shadowControllers=new Map(),originalTextures=new Map(),originalShadows=new Map(),listeners=new Set();
   let originalFar=null,lastAppliedFar=null;
+  // Global lighting (IBL): host adapter owns hemi/ambient + Prismia provider;
+  // without an adapter the controller toggles scene.environment directly.
+  let savedEnvironment=scene?.environment??null;
+  let savedEnvironmentIntensity=('environmentIntensity' in (scene??{}))?scene.environmentIntensity:1;
+  let lastGlobalEnabled=null,lastGlobalIntensity=null;
   const aoCompatible=!!aoOptions&&[186,187].includes(revision)&&renderer.capabilities?.isWebGL2===true;
   const aoPipeline=aoCompatible?createViewportAmbientOcclusion(viewport,{...aoOptions,options:value}):null;
   const ceiling=()=>Math.min(limits.shadowCeiling,Number(shadowAdapter?.snapshot?.()?.ceiling)||Infinity);
@@ -176,6 +184,41 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
   };
   function scale(){const next=currentRatio();if(Math.abs(next-effectiveRatio)<.001)return;effectiveRatio=next;renderer.setPixelRatio?.(next);invalidate();}
   function invalidateMaterials(){for(const material of collectMaterials(scene,additionalMaterials))material.needsUpdate=true;}
+  function applyGlobalLighting(){
+    const enabled=!!value.globalLighting,intensity=value.globalLightingIntensity;
+    if(globalLightingAdapter){
+      globalLightingAdapter.setEnabled?.(enabled);
+      globalLightingAdapter.setIntensity?.(intensity);
+      lastGlobalEnabled=enabled;lastGlobalIntensity=intensity;
+      return;
+    }
+    if(!scene)return;
+    // Track host replacements (world switch restores its own environment).
+    if(enabled&&scene.environment&&scene.environment!==savedEnvironment)savedEnvironment=scene.environment;
+    if(!enabled&&scene.environment)savedEnvironment=scene.environment;
+    const wasEnabled=lastGlobalEnabled;
+    if(!enabled){
+      if(scene.environment)scene.environment=null;
+      if('environmentIntensity' in scene)scene.environmentIntensity=0;
+    } else {
+      if(savedEnvironment&&scene.environment!==savedEnvironment)scene.environment=savedEnvironment;
+      if('environmentIntensity' in scene)scene.environmentIntensity=intensity;
+    }
+    // Toggling the environment map changes compiled variants; intensity alone
+    // is a uniform and needs no recompile.
+    if(wasEnabled!==null&&wasEnabled!==enabled)invalidateMaterials();
+    lastGlobalEnabled=enabled;lastGlobalIntensity=intensity;
+  }
+  function globalLightingSnapshot(){
+    const adapterSnapshot=globalLightingAdapter?.snapshot?.()??null;
+    return {
+      enabled:!!value.globalLighting,intensity:value.globalLightingIntensity,
+      viaAdapter:!!globalLightingAdapter,
+      hasEnvironment:!!scene?.environment,
+      environmentIntensity:('environmentIntensity' in (scene??{}))?scene.environmentIntensity:null,
+      adapter:adapterSnapshot,
+    };
+  }
   function applyShadowAdjust(){
     for(const shadow of shadows){
       if(!originalShadows.has(shadow))originalShadows.set(shadow,{bias:shadow.bias,normalBias:shadow.normalBias,radius:shadow.radius});
@@ -238,9 +281,9 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
       if(value.cameraFar>0){if(originalFar===null||lastAppliedFar!==null&&camera.far!==lastAppliedFar)originalFar=camera.far;const far=Math.max(value.cameraFar,(Number(camera.near)||0)+.001);if(camera.far!==far){camera.far=far;camera.updateProjectionMatrix?.();}lastAppliedFar=far;}
       else if(originalFar!==null){if(camera.far===lastAppliedFar){camera.far=originalFar;camera.updateProjectionMatrix?.();}originalFar=null;lastAppliedFar=null;}
     }
-    aoPipeline?.set(value);scale();applyShadows({forceQuality});applyTextures();invalidate();
+    aoPipeline?.set(value);applyGlobalLighting();scale();applyShadows({forceQuality});applyTextures();invalidate();
   }
-  const snapshot=()=>({settings:{...value}, effectivePixelRatio:effectiveRatio,adaptiveScale:adaptive.scale,limits:{...limits,shadowCeiling:ceiling(),shadowMin:Number(shadowAdapter?.minSize)||1},
+  const snapshot=()=>({settings:{...value}, effectivePixelRatio:effectiveRatio,adaptiveScale:adaptive.scale,limits:{...limits,shadowCeiling:ceiling(),shadowMin:Number(shadowAdapter?.minSize)||1},globalLighting:globalLightingSnapshot(),
     shadows:shadows.map(shadow=>({size:shadow.mapSize?.x??0,bias:shadow.bias,normalBias:shadow.normalBias,radius:shadow.radius})),
     shadowInfo:shadowAdapter?.snapshot?.()??shadowControllers.values().next().value?.snapshot()??null, effectiveCameraFar:camera?.far??null, aoSupported:!!aoPipeline&&!!camera?.isPerspectiveCamera, aoActive:!!aoPipeline?.active, perspective:!!camera?.isPerspectiveCamera,
     supportedToneMappings:[...supported.toneMapping],
@@ -291,6 +334,8 @@ export function createViewportGraphics(viewport,{settings={},defaults={},onChang
     dispose(){if(disposed)return;disposed=true;offDispose();offResize();offBefore();offAfter();aoPipeline?.dispose();
       for(const [texture,original] of originalTextures)if(texture.anisotropy!==original){texture.anisotropy=original;texture.needsUpdate=true;}
       if(originalFar!==null&&camera){if(camera.far===lastAppliedFar){camera.far=originalFar;camera.updateProjectionMatrix?.();}originalFar=null;}
+      if(globalLightingAdapter){globalLightingAdapter.setEnabled?.(true);globalLightingAdapter.setIntensity?.(1);}
+      else if(scene){if(savedEnvironment)scene.environment=savedEnvironment;if('environmentIntensity' in scene)scene.environmentIntensity=savedEnvironmentIntensity;}
       shadowControllers.clear();originalTextures.clear();originalShadows.clear();listeners.clear();},
   });
   offDispose=viewport.onDispose?.(()=>api.dispose())??(()=>{});

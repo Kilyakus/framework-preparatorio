@@ -3,6 +3,17 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.3.0] — 2026-11-24
+
+- В настройках `viewport3d` добавлена секция «Глобальное освещение»:
+  переключатель IBL (`globalLighting`) и интенсивность окружения
+  (`globalLightingIntensity`, 0–3). Без адаптера контроллер toggles
+  `scene.environment` / `scene.environmentIntensity` и восстанавливает их
+  при `dispose`; с `globalLightingAdapter` хост сам управляет IBL,
+  полусферой/эмбиентом и провайдером окружения Prismia. Направленные
+  источники не затрагиваются. Значения сохраняются хостом как остальные
+  настройки графики.
+
 ## [Не опубликовано]
 
 - Общие `viewport3d` получили встроенную «Студию» с сеткой, поиск окружений

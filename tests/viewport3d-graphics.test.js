@@ -17,6 +17,11 @@ test('graphics settings clamp malformed and legacy inputs without eating host st
  const value=normalizeViewportGraphics({exposure:100,renderScale:.01,shadow:'8192',anisotropy:'999',cameraFov:500});
  assert.equal(value.exposure,3);assert.equal(value.renderScale,.5);assert.equal(value.shadow,'8192');assert.equal(value.anisotropy,'source');assert.equal(value.cameraFov,100);
  assert.doesNotThrow(()=>normalizeViewportGraphics(null));
+ const gl=normalizeViewportGraphics({globalLighting:'yes',globalLightingIntensity:99});
+ assert.equal(gl.globalLighting,true);assert.equal(gl.globalLightingIntensity,3);
+ assert.equal(normalizeViewportGraphics({globalLighting:false}).globalLighting,false);
+ assert.equal(normalizeViewportGraphics({}).globalLighting,true);
+ assert.equal(normalizeViewportGraphics({}).globalLightingIntensity,1);
 });
 test('renderer settings, GPU caps, shadows and textures are applied and restored without owning scene assets',()=>{
  const vp=createViewport3D({THREE,container:host()}),s=shadow(),texture={isTexture:true,anisotropy:2},mat={map:texture,needsUpdate:false};
@@ -72,6 +77,29 @@ test('far clipping is opt-in, finite and restored when reset or disposed',()=>{
  g.dispose();assert.equal(vp.camera.far,500);vp.dispose();
 });
 
+test('global lighting toggles scene.environment and restores it on dispose',()=>{
+ const vp=createViewport3D({THREE,container:host()});
+ const env={isTexture:true};vp.scene.environment=env;vp.scene.environmentIntensity=1;
+ const g=createViewportGraphics(vp);
+ assert.equal(vp.scene.environment,env);assert.equal(g.snapshot().globalLighting.hasEnvironment,true);
+ g.set({globalLighting:false});assert.equal(vp.scene.environment,null);assert.equal(vp.scene.environmentIntensity,0);
+ assert.equal(g.snapshot().globalLighting.enabled,false);
+ g.set({globalLighting:true,globalLightingIntensity:2.5});assert.equal(vp.scene.environment,env);assert.equal(vp.scene.environmentIntensity,2.5);
+ // Host replaces the environment (world switch): refresh must keep the new one.
+ const env2={isTexture:true};vp.scene.environment=env2;g.refresh();assert.equal(vp.scene.environment,env2);
+ g.set({globalLighting:false});assert.equal(vp.scene.environment,null);
+ g.dispose();assert.equal(vp.scene.environment,env2);assert.equal(vp.scene.environmentIntensity,1);vp.dispose();
+});
+test('global lighting adapter owns hemi/ambient and scene.environment is untouched',()=>{
+ const vp=createViewport3D({THREE,container:host()});
+ const env={isTexture:true};vp.scene.environment=env;
+ const calls=[];const adapter={setEnabled:v=>calls.push(['enabled',v]),setIntensity:v=>calls.push(['intensity',v]),snapshot:()=>({enabled:true})};
+ const g=createViewportGraphics(vp,{globalLightingAdapter:adapter,settings:{globalLighting:false,globalLightingIntensity:.5}});
+ assert.equal(vp.scene.environment,env);assert.deepEqual(calls,[['enabled',false],['intensity',.5]]);
+ assert.equal(g.snapshot().globalLighting.viaAdapter,true);
+ g.set({globalLighting:true,globalLightingIntensity:2});assert.deepEqual(calls.at(-2),['enabled',true]);assert.deepEqual(calls.at(-1),['intensity',2]);
+ g.dispose();assert.deepEqual(calls.at(-2),['enabled',true]);assert.deepEqual(calls.at(-1),['intensity',1]);vp.dispose();
+});
 test('shared auto shadow quality reacts to sustained load and preserves manual selection',()=>{
  const vp=createViewport3D({THREE,container:host()}),s=shadow();s.camera={top:2,bottom:-2};vp.scene.add({isLight:true,castShadow:true,shadow:s});
  const perf=globalThis.performance;let now=1;Object.defineProperty(globalThis,'performance',{configurable:true,value:{now:()=>now}});

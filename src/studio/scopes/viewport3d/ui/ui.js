@@ -35,6 +35,12 @@ const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
     <div class="v3d-field"><span>Цветовое пространство вывода</span><div data-v3d-select-slot="colorSpace"></div></div>
     <p class="v3d-info">Без тонального отображения экспозиция может не влиять на материалы. Линейный вывод предназначен для специальных рабочих процессов.</p>
   </details>
+  <details open><summary>Глобальное освещение</summary>
+    <label class="v3d-check"><input data-v3d-setting="globalLighting" type="checkbox"> Включить глобальное освещение (IBL)</label>
+    <label class="range-row"><span>Интенсивность окружения</span><output data-v3d-output="globalLightingIntensity"></output><input data-v3d-setting="globalLightingIntensity" type="range" min="0" max="3" step="0.05"></label>
+    <p class="v3d-info" data-v3d-global-lighting-info></p>
+    <p class="v3d-info">Отключает карту окружения (IBL) и, если хост подключил адаптер, фоновые источники (полусфера/эмбиент). Направленные источники (ключевой, заполняющий, контровой) не затрагиваются. Отключение полезно для диагностики: если FPS не растёт, причина не в IBL.</p>
+  </details>
   <details open><summary>Тени</summary>
     <div class="v3d-field"><span>Качество теней</span><div data-v3d-select-slot="shadow"></div></div>
     <p class="v3d-info" data-v3d-shadow-info></p>
@@ -64,7 +70,7 @@ const GRAPHICS_TEMPLATE = `<div class="v3d-graphics" data-v3d-graphics>
     <p class="v3d-info" data-v3d-far-info></p>
   </details>
 </div>`;
-const ranges={renderScale:v=>`${Math.round(v*100)}%`,maxPixelRatio:v=>`${v.toFixed(1)}×`,exposure:v=>v.toFixed(2),shadowBias:v=>v.toFixed(5),shadowNormalBias:v=>v.toFixed(4),shadowRadius:v=>v.toFixed(1),cameraFov:v=>`${Math.round(v)}°`,aoStrength:v=>`${Math.round(v)}%`,aoRadius:v=>`${v.toFixed(1)} м`};
+const ranges={renderScale:v=>`${Math.round(v*100)}%`,maxPixelRatio:v=>`${v.toFixed(1)}×`,exposure:v=>v.toFixed(2),shadowBias:v=>v.toFixed(5),shadowNormalBias:v=>v.toFixed(4),shadowRadius:v=>v.toFixed(1),cameraFov:v=>`${Math.round(v)}°`,aoStrength:v=>`${Math.round(v)}%`,aoRadius:v=>`${v.toFixed(1)} м`,globalLightingIntensity:v=>v.toFixed(2)};
 
 // Options and descriptions are data, not HTML: the Preparatorio component
 // renders their text safely and displays the descriptions in its portal menu.
@@ -173,6 +179,9 @@ export function mountViewportGraphics({host,graphics,legacyIds=false,ui,sections
     inputFor('ao').disabled=!state.aoSupported;
     for(const key of ['aoStrength','aoRadius','aoHalfRes','aoDynamic','aoCharacters'])inputFor(key).disabled=!state.aoSupported||!v.ao;
     root.querySelector('[data-v3d-ao-info]').textContent=state.aoSupported?'Категории задаются приложением. Непомеченные объекты считаются статичными; скиннованные меши — персонажами. AO нагружает видеокарту.':'AO недоступен: нужны дополнения Three.js r186/r187, WebGL2 и перспективная камера.';
+    inputFor('globalLightingIntensity').disabled=!v.globalLighting;
+    {const gl=state.globalLighting??{enabled:v.globalLighting,intensity:v.globalLightingIntensity,hasEnvironment:false,environmentIntensity:null,viaAdapter:false};
+     root.querySelector('[data-v3d-global-lighting-info]').textContent=`Фактически: ${gl.enabled?'включено':'выключено'} · окружение ${gl.hasEnvironment?'есть':'нет'}${gl.environmentIntensity!=null?` · интенсивность ${Number(gl.environmentIntensity).toFixed(2)}`:''}${gl.viaAdapter?' · через адаптер хоста':''}.`;}
     root.querySelector('[data-v3d-far-info]').textContent=`Текущая дальность: ${state.effectiveCameraFar??'—'}. Большая дальность снижает точность буфера глубины; 0 возвращает значение приложения.`;
     root.querySelector('[data-v3d-resolution-info]').textContent=`Фактическая плотность: ${state.effectivePixelRatio.toFixed(2)}×${v.adaptiveResolution?` · адаптация ${Math.round(state.adaptiveScale*100)}%`:''}.`;
     const attrs=state.limits.attributes;
