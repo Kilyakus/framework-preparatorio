@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';import * as THREE from 'three';
+import {createViewportSkeleton,boneGroupColor} from '../src/studio/scopes/viewport3d/index.js';
+test('shared Morphia-style skeleton has joints, tracks transforms, accepts extension weights and disposes',()=>{
+ const scene=new THREE.Scene(),root=new THREE.Group(),a=new THREE.Bone(),b=new THREE.Bone(),c=new THREE.Bone();a.name='Hips';b.name='LeftArm';c.name='Head';b.position.set(1,0,0);c.position.y=1;a.add(b);b.add(c);root.add(a);scene.add(root);
+ const sk=createViewportSkeleton({THREE,scene,root});sk.update();assert.deepEqual([sk.snapshot().bones,sk.snapshot().edges,sk.snapshot().visiblePoints,sk.snapshot().linesVisible],[3,2,3,true]);
+ const points=scene.getObjectByName('viewport3d-skeleton-points');assert.equal(points.children.length,3);assert(points.children.every(p=>p.geometry.type==='SphereGeometry'&&!p.material.depthTest));assert.equal(points.children[1].material.color.getHex(),new THREE.Color(boneGroupColor('LeftArm')).convertSRGBToLinear().getHex());
+ root.position.set(3,4,5);b.position.x=2;sk.update();assert.deepEqual(points.children[1].position.toArray(),[5,4,5]);
+ sk.update({weight:bone=>bone===b?1:0});assert.equal(sk.snapshot().visiblePoints,1);assert(sk.snapshot().linesVisible);
+ sk.update({weight:()=>0,selectedId:c.uuid});assert.equal(sk.snapshot().visiblePoints,1);assert(points.children[2].visible);
+ sk.update({visible:false});assert.equal(sk.snapshot().visiblePoints,0);assert.equal(sk.snapshot().linesVisible,false);
+ const other=new THREE.Group(),d=new THREE.Bone();other.add(d);scene.add(other);sk.setRoot(other);sk.update();assert.equal(sk.snapshot().bones,1);assert.equal(sk.snapshot().edges,0);assert.equal(sk.snapshot().visiblePoints,1);sk.dispose();sk.dispose();assert.equal(scene.getObjectByName('viewport3d-skeleton-points'),undefined);assert.equal(scene.getObjectByName('viewport3d-skeleton-lines'),undefined);
+});
+test('bones referenced only by a skinned mesh are supported',()=>{const scene=new THREE.Scene(),root=new THREE.Group(),bone=new THREE.Bone(),mesh=new THREE.SkinnedMesh(new THREE.BoxGeometry(),new THREE.MeshBasicMaterial());const count=mesh.geometry.attributes.position.count;mesh.geometry.setAttribute('skinIndex',new THREE.Uint16BufferAttribute(new Uint16Array(count*4),4));const weights=new Float32Array(count*4);for(let i=0;i<count;i++)weights[i*4]=1;mesh.geometry.setAttribute('skinWeight',new THREE.Float32BufferAttribute(weights,4));mesh.bind(new THREE.Skeleton([bone]));root.add(mesh);scene.add(root);const sk=createViewportSkeleton({THREE,scene,root});sk.update();assert.equal(sk.snapshot().visiblePoints,1);sk.dispose()});

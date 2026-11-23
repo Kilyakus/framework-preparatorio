@@ -486,3 +486,9 @@ Morphia Studio 2.0.142, где сборка и запуск интерфейса
 ## Лицензия
 
 [MIT](LICENSE), © 2026 Kilyakus.
+
+The built-in Studio map includes a decorative pedestal by default. Hosts that
+need a clean floorless viewport can pass `environmentOptions: { gridVisible:
+false, studioColors: { pedestalVisible: false } }` to `mountViewportChrome`.
+The grid remains separately controllable and the pedestal remains enabled for
+existing hosts by default.

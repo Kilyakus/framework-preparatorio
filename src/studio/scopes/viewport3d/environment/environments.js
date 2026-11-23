@@ -44,7 +44,7 @@ export function discoverViewportEnvironments({manifests={},entries={}}={}) {
  * Mounts are serialized and stale
  * requests are discarded; a failed environment falls back to Studio.
  */
-export function createViewportEnvironments(viewport,{environments=[],gridVisible=true,studioGrid=null,display=null,preserveBackground=false,invalidate=()=>{},onError=()=>{}}={}) {
+export function createViewportEnvironments(viewport,{environments=[],gridVisible=true,studioGrid=null,studioColors={},getGridFocus=null,display=null,preserveBackground=false,createContext=null,afterMount=null,invalidate=()=>{},onError=()=>{}}={}) {
   const {THREE,scene,camera,renderer}=viewport??{};
   if(!THREE||!scene)throw new TypeError('viewport environments require host THREE and scene');
   const specs=new Map(),listeners=new Set(),originalBackground=scene.background,originalFog=scene.fog;
@@ -52,13 +52,24 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
   // established appearance. Otherwise Studio owns the common shader grid.
   const ownsGrid=!studioGrid,grid=studioGrid??createBaseMapGrid(THREE,scene),originalGridVisible=grid.visible;
   grid.setGround?.(0);
+  // Resolve world position immediately before drawing, including paused/on-demand
+  // renderers. No RAF or subject ownership is introduced by the map.
+  const previousBeforeRender=grid.onBeforeRender;
+  const focusVector=THREE.Vector3?new THREE.Vector3():null;
+  grid.onBeforeRender=function(...args){
+    previousBeforeRender?.apply(this,args);
+    const focus=getGridFocus?.();
+    if(focus?.getWorldPosition&&focusVector)grid.setFocus?.(focus.getWorldPosition(focusVector));
+    else grid.setFocus?.(focus);
+  };
   let wanted=gridVisible!==false,currentId=BASE_MAP_ID,current=studioMap,objects=[],cleanups=[],disposed=false,token=0,queue=Promise.resolve(),lastError=null,controller=null,requested=BASE_MAP_ID;
   const emit=()=>{for(const fn of [...listeners])try{fn(currentId);}catch(error){console.warn('viewport environment listener',error);}invalidate();};
   const restore=()=>{scene.background=originalBackground;scene.fog=originalFog;};
   const applyGrid=()=>{grid.visible=isBaseMap(currentId)&&wanted;invalidate();};
   const context=()=>{
     controller=new AbortController();const signal=controller.signal;
-    return {THREE,scene,camera,renderer,signal,
+    const base={THREE,scene,camera,renderer,signal,studioColors,
+      reload(){if(!signal.aborted)return api.set(currentId,{force:true});},
       add(object){if(signal.aborted)throw new Error('viewport environment was disposed');if(object){scene.add(object);objects.push(object);}return object;},
       own(fn){if(typeof fn==='function'){if(signal.aborted)fn();else cleanups.push(fn);}return fn;},
       contributeDisplay(item){
@@ -69,11 +80,12 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
       look(options={}){
         if(signal.aborted)return;
         if(!preserveBackground&&options.clearColor!=null)scene.background=new THREE.Color(options.clearColor);
-        if(options.fog===null)scene.fog=null;
+        if(options.fog===null)scene.fog=null;else if(options.fog && THREE.Fog)scene.fog=new THREE.Fog(options.fog.color,options.fog.near,options.fog.far);
         if(options.grid?.palette)grid.setPalette?.(options.grid.palette);
         applyGrid();
       },
     };
+    return Object.assign(base,createContext?.(base)??{});
   };
   let ctx=null;
   const clear=()=>{
@@ -82,6 +94,19 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
     for(const fn of cleanups.splice(0).reverse())try{fn();}catch(error){console.warn('viewport environment cleanup',error);}
     for(const object of objects.splice(0))object.removeFromParent?.();
     current=null;ctx=null;restore();
+  };
+  const settingsKey=id=>`viewport3d.map-settings:${id}`;
+  const restoreSettings=(mod,id)=>{if(!Array.isArray(mod.settingsSchema)||typeof mod.updateSettings!=='function')return;try{const raw=globalThis.localStorage?.getItem(settingsKey(id));if(raw){const value=JSON.parse(raw);if(value&&typeof value==='object'&&!Array.isArray(value))mod.updateSettings(value,ctx);}}catch(error){console.warn('viewport map settings restore:',error);}};
+  const saveSettings=(mod,id)=>{try{globalThis.localStorage?.setItem(settingsKey(id),JSON.stringify(mod.getSettings(ctx)));}catch{} };
+  const installSettings=(mod)=>{
+    if(!display?.register||!Array.isArray(mod.settingsSchema)||typeof mod.getSettings!=='function'||typeof mod.updateSettings!=='function')return;
+    for(const field of mod.settingsSchema){
+      if(!field?.key||!field.label||!['toggle','range','select'].includes(field.type))continue;
+      const key=String(field.key),id='map-setting-'+key.toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/-+$/,'');
+      const remove=display.register({id,label:field.label,getLabel:()=>field.label,description:field.description,order:20,type:field.type,...(field.type==='range'?{min:field.min,max:field.max,step:field.step}:{}),...(field.type==='select'?{options:field.options}:{}),
+        get:()=>mod.getSettings(ctx)?.[key]??field.default,set:value=>{mod.updateSettings({[key]:value},ctx);saveSettings(mod,currentId);display.refresh();invalidate();}});
+      cleanups.push(remove);
+    }
   };
   const installStudio=()=>{currentId=BASE_MAP_ID;current=studioMap;ctx=context();studioMap.mount(ctx);applyGrid();};
   const register=(spec,{builtIn=false}={})=>{
@@ -97,7 +122,7 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
     for(const spec of BUILTIN_VIEWPORT_ENVIRONMENTS)specs.set(spec.id,normalizeViewportEnvironment(spec,{builtIn:true}));
     for(const spec of environments){const normalized=normalizeViewportEnvironment(spec);if(specs.has(normalized.id))throw new Error(`Duplicate viewport environment: ${normalized.id}`);specs.set(normalized.id,normalized);}
     installStudio();
-  } catch(error) {if(ownsGrid)grid.dispose?.();else grid.visible=originalGridVisible;restore();throw error;}
+  } catch(error) {grid.onBeforeRender=previousBeforeRender;if(ownsGrid)grid.dispose?.();else grid.visible=originalGridVisible;restore();throw error;}
   const listAll=()=>[...specs.values()].sort((a,b)=>a.order-b.order).map(s=>({id:s.id,label:s.label,description:s.description,builtIn:s.builtIn,enabled:s.enabled,active:s.id===currentId}));
   async function change(id,options,request){
     if(disposed||request!==token)return false;
@@ -109,9 +134,12 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
       if(typeof mod?.mount!=='function')throw new Error('нет функции mount(ctx)');
       if(disposed||request!==token)return false;
       clear();currentId=id;current=mod;ctx=context();applyGrid();
+      restoreSettings(mod,id);
       await mod.mount(ctx,options);
       if(disposed||request!==token){clear();if(!disposed)installStudio();return false;}
-      lastError=null;emit();return true;
+      await afterMount?.(ctx,mod);
+      if(disposed||request!==token){clear();if(!disposed)installStudio();return false;}
+      installSettings(mod);lastError=null;emit();return true;
     }catch(error){
       if(disposed)return false;
       clear();installStudio();lastError=`Ошибка окружения «${id}»: ${error?.message??error}`;
@@ -127,8 +155,9 @@ export function createViewportEnvironments(viewport,{environments=[],gridVisible
     async setEnabled(id,enabled){const spec=specs.get(id);if(disposed||!spec||id===BASE_MAP_ID)return false;spec.enabled=!!enabled;
       if(!spec.enabled&&requested===id&&currentId!==id)++token;
       if(!spec.enabled&&currentId===id)await api.set(BASE_MAP_ID);emit();return true;},
+    update(dt){if(!disposed&&Number.isFinite(dt)&&dt>=0)current?.update?.(dt,ctx);},
     onChange(fn){listeners.add(fn);return()=>listeners.delete(fn);},
-    dispose(){if(disposed)return;disposed=true;++token;clear();if(ownsGrid)grid.dispose?.();else grid.visible=originalGridVisible;listeners.clear();invalidate();},
+    dispose(){if(disposed)return;disposed=true;++token;clear();grid.onBeforeRender=previousBeforeRender;if(ownsGrid)grid.dispose?.();else grid.visible=originalGridVisible;listeners.clear();invalidate();},
   });
   return api;
 }

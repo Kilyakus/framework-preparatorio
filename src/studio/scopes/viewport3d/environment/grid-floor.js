@@ -31,78 +31,29 @@ const VERT = /* glsl */ `
   }
 `;
 
+// A clear, bounded one-metre editor grid, plus the original Physio-style
+// half-metre grid revealed around the moving subject outside that boundary.
 const FRAG = /* glsl */ `
   varying vec3 vWorld;
-
-  uniform vec3  uMinor;        // мелкая линия
-  uniform vec3  uMajor;        // крупная линия
-  uniform vec3  uAxisX;        // ось X
-  uniform vec3  uAxisZ;        // ось Z
-  uniform vec3  uRing;         // круг арены
-  uniform vec3  uFill;         // подложка пола (чтобы плоскость читалась)
-  uniform float uCell;         // размер мелкой клетки, ед.
-  uniform float uMajorEvery;   // крупная линия каждые N клеток
-  uniform float uRingRadius;   // радиус круга, ед.
-  uniform float uRingWidth;    // толщина линии круга, ед.
-  uniform float uFadeStart;    // откуда начинает гаснуть
-  uniform float uFadeEnd;      // где гаснет совсем
-  uniform float uOpacity;
-  uniform float uGroundY;
-
-  // Антиалиасинг линий: делим расстояние до ближайшей линии на размер пикселя
-  // в этих координатах. Так линия всегда шириной ~1 пиксель, без муара.
+  uniform vec3 uMinor, uMajor, uAxisX, uAxisZ, uRing, uFill;
+  uniform float uCell, uOpacity;
+  uniform vec2 uFocus;
+  uniform float uGridHalfExtent, uNearStart, uNearEnd;
   float lineMask(vec2 p) {
-    vec2 g = abs(fract(p - 0.5) - 0.5) / fwidth(p);
-    return 1.0 - min(min(g.x, g.y), 1.0);
+    vec2 g=abs(fract(p-0.5)-0.5)/max(fwidth(p),vec2(0.0001));
+    return 1.0-min(min(g.x,g.y),1.0);
   }
-  float axisMask(float v) {
-    return 1.0 - min(abs(v) / fwidth(v), 1.0);
-  }
-
   void main() {
-    vec2 w = vWorld.xz;
-
-    // 1) гаснет по расстоянию от точки обзора-центра: горизонт растворяется
-    float dist = length(w);
-    float fade = 1.0 - smoothstep(uFadeStart, uFadeEnd, dist);
-    // у самой кромки плоскость прозрачна полностью
-    if (fade <= 0.002) discard;
-
-    // 2) две частоты линий
-    float fine = lineMask(w / uCell) * 0.8;
-    float coarse = lineMask(w / (uCell * uMajorEvery));
-
-    vec3 color = mix(uMinor, uMajor, coarse);
-    float alpha = max(fine, coarse);
-
-    // 2a) сама плоскость: очень слабая подложка, гаснущая к горизонту. Без неё
-    // пол — это только линии в пустоте; с ней читается поверхность.
-    // Подложка нужна, чтобы линии не висели в пустоте, но она не должна
-    // перекрывать пол под ними: 0.25 вместо 0.65 — иначе пол становится
-    // чёрной плитой, которая обрывается к горизонту.
-    float fill = (1.0 - smoothstep(0.0, uFadeStart * 1.4, dist)) * 0.25;
-    color = mix(uFill, color, max(alpha, 1e-3));
-    alpha = max(alpha, fill);
-
-    // 3) Оси как в Blender: X — приглушённый красный, Z — зелёный.
-    float axisX = axisMask(w.x);
-    float axisZ = axisMask(w.y);   // w.y — это мировой Z
-    color = mix(color, uAxisX, axisX * 0.85);
-    color = mix(color, uAxisZ, axisZ * 0.85);
-    alpha = max(alpha, max(axisX, axisZ) * 0.75);
-
-    // 4) круг арены: чёткое кольцо + мягкое свечение вокруг него. Кольцо
-    // держим шириной около двух пикселей на любом удалении — оно не должно
-    // ни исчезать, ни превращаться в жирную полосу вблизи.
-    float rr = length(w);
-    float d = abs(rr - uRingRadius);
-    float px = max(fwidth(rr), 1e-4);
-    float ringLine = 1.0 - min(d / max(px * 1.6, uRingWidth * 0.35), 1.0);
-    float ringGlow = exp(-pow((rr - uRingRadius) / (uRingWidth * 11.0), 2.0)) * 0.45;
-    color = mix(color, uRing, max(ringLine, ringGlow * 0.7));
-    alpha = max(alpha, max(ringLine * 0.95, ringGlow));
-
-    gl_FragColor = vec4(color, alpha * fade * uOpacity);
+    vec2 w=vWorld.xz;
+    float edge=max(abs(w.x),abs(w.y));
+    float inside=1.0-smoothstep(uGridHalfExtent-0.015,uGridHalfExtent+0.015,edge);
+    float nearFocus=1.0-smoothstep(uNearStart,uNearEnd,distance(w,uFocus));
+    float mainLine=lineMask(w/uCell)*inside;
+    float outerLine=lineMask(w/(uCell*0.5))*(1.0-inside)*nearFocus;
+    float a=max(mainLine*0.55,outerLine*0.55)*uOpacity;
+    if(a<0.001)discard;
+    vec3 outerColor=mix(uMinor,uMajor,0.20);
+    gl_FragColor=vec4(mix(outerColor,uMajor,step(outerLine,mainLine)),a);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -140,9 +91,9 @@ export function createGridFloorClass(THREE) {
       uFill: { value: lin(opts.fill ?? 0x1a2030) },
       // Сцена Morphia живёт в метрах (персонаж ~1.8), а не в единицах
       // Rephlexia (214.5 на метр). Всё, что задано в мировых единицах, здесь
-      // поэтому тоже в метрах: сетка в 32 клетки на арену радиусом 3.2,
+      // поэтому тоже в метрах: клетка равна одному метру,
       // крупная линия каждые 5 клеток, кольцо и затухание — по арене.
-      uCell: { value: opts.cell ?? 0.2 },
+      uCell: { value: opts.cell ?? 1 },
       uMajorEvery: { value: opts.majorEvery ?? 5 },
       uRingRadius: { value: opts.radius ?? 3.2 },
       uRingWidth: { value: opts.ringWidth ?? 0.016 },
@@ -150,6 +101,10 @@ export function createGridFloorClass(THREE) {
       uFadeEnd: { value: opts.fadeEnd ?? 26 },
       uOpacity: { value: 1 },
       uGroundY: { value: 0 },
+      uFocus: { value: new THREE.Vector2(0, 0) },
+      uGridHalfExtent: { value: opts.halfExtent ?? 3.25 },
+      uNearStart: { value: opts.nearStart ?? 3 },
+      uNearEnd: { value: opts.nearEnd ?? 11 },
     };
 
     // Плоскость заведомо больше дальней плоскости камеры: конец сетки делает
@@ -179,6 +134,13 @@ export function createGridFloorClass(THREE) {
       const color = new THREE.Color(value).convertSRGBToLinear();
       this.uniforms[uniformName].value.copy(color);
     }
+  }
+
+  setFocus(position) {
+    if (!position) return;
+    const x=Array.isArray(position)?position[0]:position.x;
+    const z=Array.isArray(position)?position[2]:position.z;
+    if(Number.isFinite(x)&&Number.isFinite(z))this.uniforms.uFocus.value.set(x,z);
   }
 
   // Уровень земли: сетка всегда лежит на полу, как бы он ни переехал.

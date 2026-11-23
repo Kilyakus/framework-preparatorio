@@ -408,3 +408,33 @@ removeExtra();
 координатами, сбросьте унаследованное размещение: `{id:'fps', group:'scene',
 row:null, side:null}`. Иначе явно заданные в базовом слое `row` и `side`
 продолжают иметь приоритет над размещением группы.
+
+### Параметры карты
+
+Карта может экспортировать `settingsSchema` (массив `{key,label,type,default}`),
+`getSettings()` и `updateSettings(partial)`. Поля `toggle`, `range` (также
+`min`, `max`, `step`) и `select` (`options`) автоматически отображаются в
+меню viewport3d «Отображение» во время действия карты и удаляются при её
+смене. Значения сохраняются отдельно для каждой карты в localStorage; применение изменений остаётся у карты;
+физические адаптеры зависят от хоста и этим интерфейсом не предоставляются.
+Базовая сетка viewport3d имеет шаг один метр при метровых единицах сцены.
+
+Хост может предоставить `createContext(base)` и `afterMount(ctx, module)`,
+чтобы добавить в контекст карты адаптер физики. Карта регистрирует очистку
+через `ctx.own`, а `environment.update(dt)` вызывает её `update`. Для
+перестройки карты доступен `ctx.reload()`. Неподключённая физика не создаётся
+автоматически: реальные тела остаются собственностью хоста.
+
+Map settings callbacks receive the active viewport context as an optional argument: `getSettings(ctx)` and `updateSettings(partial, ctx)`. Map modules can use this context to keep each mounted map instance independent; existing callbacks that ignore the extra argument remain compatible.
+
+### Studio host palette and focus (not user-facing)
+
+Hosts may pass `environmentOptions.studioColors` with `background`, `pedestal`, and `grid: {major, minor}` colors. These are configuration, not map settings, and never appear in Display. Studio uses a one-metre bounded grid; outside it a half-metre grid fades with distance from `environmentOptions.getGridFocus()`. The callback may return a Three Object3D, a world-space `{x,z}` or `[x,y,z]`; without a subject the focus stays at the origin. Colours are shared by the map assets and work with the host's Three version.
+
+### Surface, wireframe and skeleton
+
+The common viewport header includes these three modes. By default they follow `viewport.activeObject` / `viewport.setActiveObject(object)`; hosts can provide `shadingOptions.getObject()` instead. Skeleton mode displays all model bones as Morphia-style coloured joint spheres and connecting lines, and is disabled when the selected object has no bones. The visual is supplied by `createViewportSkeleton({THREE, scene, root})`; call `update()` after animation, `setRoot()` on model changes, and `dispose()` on teardown. Extensions can pass `weight`, `selectedId`, `interactiveBones` and `colorOf` to update. It does not install pointer handlers or start its own render loop. Animio supplies cursor proximity and selection; Morphia reuses that Animio interaction. Wireframe materials are temporary clones and are restored and disposed on selection changes or teardown. A host with specialised skeleton interactions can pass `shadingOptions: false` to `mountViewportChrome` and handle the same header controls itself; Morphia does this for its interactive overlay.
+
+
+### Host object selector slot
+The shared viewport header provides `[data-v3d-object-host]` immediately before `[data-v3d-mode-host]`. It is empty and hidden when unused. A host may mount its active-object selector there; it owns the object list, import and lifecycle. The viewport does not create a second object state.

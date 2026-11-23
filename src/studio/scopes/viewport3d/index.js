@@ -13,6 +13,9 @@ export { ViewportDynamicShadowQuality, SHADOW_SIZES, hardwareCeiling as viewport
 export { VIEWPORT3D_GRAPHICS_DEFAULTS, normalizeViewportGraphics, viewportHardwareLimits, viewportRendererInfo, createAdaptiveResolution, createViewportGraphics, setViewportShadowMapEnabled } from './graphics/graphics.js';
 export { VIEWPORT3D_HEADER_TEMPLATE, VIEWPORT3D_TOOLS_TEMPLATE, VIEWPORT3D_TEMPLATE, mountViewportGraphics, mountViewportSettings, mountViewportChrome } from './ui/ui.js';
 export { mountViewportSection } from './ui/sections.js';
+export { createViewportSkeleton } from './skeleton/visual.js';
+export { BONE_GROUP_COLORS, BONE_GROUP_LABELS, boneSide, classifyBoneGroup, boneGroupColor, summarizeBoneGroups } from './skeleton/bone-groups.js';
+export { VIEWPORT3D_SHADING_TEMPLATE, mountViewportShading } from './ui/shading.js';
 export { VIEWPORT3D_STATUS_DEFAULTS, VIEWPORT3D_STATUS_TEMPLATE, composeViewportStatus, mountViewportStatus } from './ui/status.js';
 export { mountViewportClasses } from './ui/classes.js';
 export { createViewportDisplay, mountViewportDisplay, contributeStudioGrid } from './ui/display.js';
@@ -28,6 +31,7 @@ export const VIEWPORT3D_SCOPE = Object.freeze({
   id: VIEWPORT3D_ID,
   areaId: 'viewport3d',
   label: '3D Просмотр',
+  iconPath: 'M2.2 4.6 8 1.8l5.8 2.8v6.8L8 14.2l-5.8-2.8V4.6Z M2.2 4.6 8 7.4l5.8-2.8 M8 7.4v6.8',
   selector: '[data-viewport3d-scope]',
   hideable: true,
   tools: Object.freeze([]),
@@ -76,7 +80,7 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
         else viewport.render();
       };
       chrome=mountViewportChrome({root:node,viewport,modeOptions:config.modeOptions,ui:config.ui,
-        environmentOptions:config.environmentOptions,settingsOptions:config.settingsOptions,classes:config.classes,
+        environmentOptions:config.environmentOptions,settingsOptions:config.settingsOptions,shadingOptions:config.shadingOptions,classes:config.classes,
         graphicsOptions:{...config.graphicsOptions,invalidate}});
       // A resized drawing buffer is cleared even when the pixel ratio is
       // unchanged, so a demand-rendered viewport must request a fresh frame.
@@ -101,6 +105,6 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
   }
   const dispose = () => {cancelRedraw();gizmo?.dispose();gizmo=null;navigation?.dispose();navigation=null;orbit?.dispose();orbit=null;chrome?.dispose();chrome=null;status?.dispose();status=null;viewport.dispose();};
   dispose.viewport3d = viewport;
-  Object.defineProperties(dispose,{status:{get:()=>status},graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},environment:{get:()=>chrome?.environment??null},display:{get:()=>chrome?.display??null},orbit:{get:()=>config.orbit===false?null:orbit},navigation:{get:()=>navigation}});
+  Object.defineProperties(dispose,{shading:{get:()=>chrome?.shading??null},status:{get:()=>status},graphics:{get:()=>chrome?.graphics??null},modes:{get:()=>chrome?.modes??null},environment:{get:()=>chrome?.environment??null},display:{get:()=>chrome?.display??null},orbit:{get:()=>config.orbit===false?null:orbit},navigation:{get:()=>navigation}});
   return dispose;
 }

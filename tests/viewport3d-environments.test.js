@@ -28,7 +28,8 @@ class Geometry{dispose(){this.disposed=true;}}
 class Material{constructor(options){Object.assign(this,options);}dispose(){this.disposed=true;}}
 class Mesh{constructor(geometry,material){this.geometry=geometry;this.material=material;this.userData={};this.rotation={};this.position={set:(...a)=>{this.pos=a;}};this.scale={setScalar:n=>{this.scalar=n;}};this.visible=true;}
   removeFromParent(){this.parent?.remove(this);}}
-const THREE={Mesh,ShaderMaterial:Material,PlaneGeometry:Geometry,Color,DoubleSide:2};
+class Vector2{constructor(x=0,y=0){this.set(x,y)}set(x,y){this.x=x;this.y=y;return this;}}
+const THREE={Vector2,Mesh,ShaderMaterial:Material,PlaneGeometry:Geometry,Color,DoubleSide:2};
 function fakeScene(){return {children:[],background:new Color(0x123456),fog:{name:'fog'},
   add(o){if(o.parent)o.removeFromParent();this.children.push(o);o.parent=this;},remove(o){this.children=this.children.filter(x=>x!==o);o.parent=null;}};}
 
@@ -102,4 +103,38 @@ test('disabling a still-loading environment invalidates its pending request',asy
   assert.equal(await env.setEnabled('loading',false),true);release();
   assert.equal(await pending,false);assert.equal(env.currentId,'studio');assert(!env.list().some(s=>s.id==='loading'));
   env.dispose();
+});
+
+test('map schema contributes dynamic controls and removes them on switching',async()=>{
+ const scene=fakeScene(),display=createViewportDisplay(),values={props:true,size:16};let mounts=0;
+ const mod={settingsSchema:[{key:'props',label:'Пропсы',type:'toggle',default:true},{key:'size',label:'Размер',type:'range',min:1,max:30,step:1,default:16}],getSettings:()=>({...values}),updateSettings(patch){Object.assign(values,patch)},mount(){mounts++}};
+ const env=createViewportEnvironments({THREE,scene,camera:{},renderer:{}},{display,environments:[{id:'schema-test',module:mod}]});
+ assert.equal(env.grid.uniforms.uCell.value,1,'integer coordinates delimit 1-metre cells');
+ assert.equal(await env.set('schema-test'),true);assert.deepEqual(display.list().map(x=>x.id),['map-setting-props','map-setting-size']);
+ display.list().find(x=>x.id==='map-setting-size').set(21);assert.equal(values.size,21);
+ display.list().find(x=>x.id==='map-setting-props').set(false);assert.equal(values.props,false);
+ assert.equal(await env.set('studio'),true);assert.equal(display.list().length,0);
+ assert.equal(await env.set('schema-test'),true);assert.equal(display.list()[0].get(),false);assert.equal(mounts,2);
+ env.dispose();assert.equal(display.list().length,0);display.dispose();
+});
+
+test('host map adapter is scoped to each mount, updated and disposed on switching',async()=>{
+ const scene=fakeScene(),events=[];let ctxSeen;
+ const env=createViewportEnvironments({THREE,scene,camera:{},renderer:{}},{createContext(ctx){ctx.own(()=>events.push('cleanup'));return {physics:{commit:()=>events.push('physics')}}},afterMount(ctx){ctx.physics.commit()},environments:[{id:'map',module:{mount(ctx){ctxSeen=ctx;events.push('mount')},update(dt,ctx){assert.equal(ctx,ctxSeen);events.push(dt)},dispose(){events.push('dispose')}}}]});
+ assert.equal(await env.set('map'),true);env.update(.25);assert.deepEqual(events,['cleanup','mount','physics',.25]);
+ await env.set('studio');assert.deepEqual(events,['cleanup','mount','physics',.25,'dispose','cleanup','physics']);env.dispose();assert.equal(events.at(-1),'cleanup');
+});
+
+test('Studio pedestal is owned by the map, and can be disabled by the host without affecting the grid',async()=>{
+  const T={...THREE,CircleGeometry:Geometry,MeshStandardMaterial:Material};
+  for(const enabled of [true,false]){
+    const scene=fakeScene();
+    const env=createViewportEnvironments({THREE:T,scene,camera:{},renderer:{}},{studioColors:{pedestalVisible:enabled},gridVisible:false});
+    const disc=scene.children.find(item=>item.name==='StudioPedestal');
+    assert.equal(!!disc,enabled);assert.equal(env.grid.visible,false);
+    await env.set('studio',{force:true});
+    assert.equal(scene.children.filter(item=>item.name==='StudioPedestal').length,Number(enabled));
+    if(disc)assert(disc.geometry.disposed&&disc.material.disposed);
+    env.dispose();assert.equal(scene.children.length,0);
+  }
 });

@@ -35,15 +35,20 @@ export function mountViewportDisplay({host,display,sections,onSectionChange}={})
       let row=rows.get(item.id);
       if(!row){
         const label=doc.createElement('label');label.className='v3d-check viewport-check';label.dataset.v3dDisplayItem=item.id;
-        const input=doc.createElement('input');input.type='checkbox';input.dataset.v3dDisplayControl=item.id;
+        const type=item.type==='range'?'range':item.type==='select'?'select':'checkbox';label.dataset.v3dDisplayType=type;
+        const input=doc.createElement(type==='select'?'select':'input');if(type!=='select')input.type=type;input.dataset.v3dDisplayControl=item.id;
         if(item.inputId)input.id=item.inputId;
         if(item.requires?.length)input.dataset.requiresScope=item.requires.join(' ');
-        const text=doc.createElement('span');text.textContent=String(item.label);label.append(input,text);
-        const onChange=()=>{const current=display.list().find(value=>value.id===item.id);if(current){current.set(input.checked);display.refresh();}};
-        input.addEventListener('change',onChange);row={label,input,text,onChange};rows.set(item.id,row);
+        if(type==='range')for(const key of ['min','max','step'])if(item[key]!=null)input[key]=item[key];
+        if(type==='select')for(const option of item.options??[]){const el=doc.createElement('option');el.value=String(option.value??option);el.textContent=String(option.label??option);input.append(el);}
+        const text=doc.createElement('span');text.textContent=String(item.label);if(type==='checkbox')label.append(input,text);else label.append(text,input);
+        const output=type==='range'?doc.createElement('output'):null;if(output)label.append(output);
+        const onChange=()=>{const current=display.list().find(value=>value.id===item.id);if(current){current.set(type==='checkbox'?input.checked:type==='range'?Number(input.value):input.value);display.refresh();}};
+        input.addEventListener('change',onChange);row={label,input,text,output,type,onChange};rows.set(item.id,row);
       }
-      row.text.textContent=String(item.label);row.label.title=item.description??'';
-      row.input.checked=!!item.get();row.input.disabled=typeof item.disabled==='function'?!!item.disabled():!!item.disabled;
+      row.text.textContent=String(item.getLabel?.()??item.label);row.label.title=item.description??'';
+      const value=item.get();if(row.type==='checkbox')row.input.checked=!!value;else row.input.value=String(value??'');if(row.output)row.output.textContent=String(value??'');
+      row.input.disabled=typeof item.disabled==='function'?!!item.disabled():!!item.disabled;
       // Keep existing rows attached (and focused) unless their order changed.
       const at=section.body.children[index];if(at!==row.label)section.body.insertBefore(row.label,at??null);
     });

@@ -3,7 +3,7 @@ import {createGridFloorClass} from '../../studio/scopes/viewport3d/environment/g
 /** The one reserved environment shipped with viewport3d itself. */
 export const BASE_MAP_ID = 'studio';
 export const BASE_MAP_GRID_PALETTE = Object.freeze({
-  minor:0x444444, major:0x686868, axisX:0xa64e4e, axisZ:0x52865c,
+  minor:0x999985, major:0xc6c5af, axisX:0xa64e4e, axisZ:0x52865c,
   ring:0x727272, fill:0x292929,
 });
 export const isBaseMap = id => String(id ?? '') === BASE_MAP_ID;
@@ -27,10 +27,18 @@ export const studioMap = Object.freeze({
   spawnPoints:Object.freeze([{id:'center', label:'Центр студии', x:0, z:0, yaw:0}]),
   gridPalette:BASE_MAP_GRID_PALETTE,
   mount(ctx) {
+    // The former compact Physio pedestal is a visual map asset, not a
+    // physics body. Its geometry and material belong to this map only.
+    const colors=ctx.studioColors??{};
+    if(colors.pedestalVisible!==false && ctx.THREE.CircleGeometry && ctx.THREE.MeshStandardMaterial && ctx.add && ctx.own){
+      const disc=new ctx.THREE.Mesh(new ctx.THREE.CircleGeometry(3.55,64),new ctx.THREE.MeshStandardMaterial({color:colors.pedestal??0x595959,roughness:1,transparent:true,opacity:.20,depthWrite:false}));
+      disc.name='StudioPedestal';disc.rotation.x=-Math.PI/2;disc.position.y=-.008;(ctx.addMeters??ctx.add)(disc);
+      ctx.own(()=>{disc.removeFromParent();disc.geometry.dispose();disc.material.dispose();});
+    }
     ctx.look({
-      clearColor:0x303030, background:null, fog:null, environment:null,
+      clearColor:colors.background??0x303030, background:null, fog:null, environment:null,
       panorama:false, cyclorama:false,
-      grid:{visible:true,palette:{...BASE_MAP_GRID_PALETTE}},
+      grid:{visible:true,palette:{...BASE_MAP_GRID_PALETTE,...colors.grid}},
       floor:{visible:false},
       lights:{
         ambient:{color:0xffffff,intensity:0.40},

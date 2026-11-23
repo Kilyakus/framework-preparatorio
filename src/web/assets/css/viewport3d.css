@@ -3,7 +3,12 @@
 .v3d-header{position:relative;display:flex;align-items:center;min-width:0}
 .v3d-spacer{flex:1;min-width:0}.v3d-mode-host{min-width:0}.v3d-mode-select .prep-select-description{display:none}
 .v3d-stage{position:relative;flex:1;min-width:0;min-height:0;overflow:hidden}.v3d-container{position:absolute;inset:0}.v3d-container canvas{display:block;width:100%;height:100%;touch-action:none}
-.v3d-tools{position:absolute;z-index:8;top:10px;left:10px;display:flex;flex-direction:column}
+.v3d-tools{position:absolute;z-index:8;top:10px;left:10px;display:flex;flex-direction:column;gap:2px;box-sizing:border-box;width:51px;padding:3px;border:1px solid var(--v3d-tools-border,var(--b-border,#171717));border-radius:var(--b-radius,4px);background:var(--v3d-tools-bg,var(--b-panel,#242424));box-shadow:0 2px 6px #0006}
+.v3d-tool{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;box-sizing:border-box;width:43px;min-width:43px;min-height:42px;padding:4px 2px;border:1px solid transparent;border-radius:var(--b-radius,4px);background:transparent;color:var(--v3d-tool-color,var(--b-text-dim));font:inherit;font-size:9px;cursor:pointer}
+.v3d-tool svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.v3d-tool:hover{background:var(--v3d-tool-hover-bg,var(--b-widget-hover));color:var(--v3d-tool-hover-color,var(--b-text))}
+.v3d-tool.active,.v3d-tool[aria-pressed=true]{background:var(--v3d-tool-active-bg,var(--b-accent));border-color:var(--v3d-tool-active-border,var(--b-accent-hover));color:var(--v3d-tool-active-color,#fff)}
+.v3d-tool:focus-visible{outline:1px solid var(--b-accent-hover);outline-offset:1px}
 .v3d-tools .v3d-tool[hidden]{display:none!important}
 .v3d-graphics-menu{position:relative;flex:none}.v3d-graphics-pop{box-sizing:border-box;position:absolute;z-index:1000;overflow:auto}.v3d-graphics-pop[hidden]{display:none!important}
 .v3d-contributions{display:flex;flex-direction:column}.v3d-contributions:empty{display:none}
@@ -30,3 +35,19 @@
 .v3d-status-left{flex:1 1 auto}
 .v3d-status-group{display:inline-flex;align-items:center;flex:none;white-space:pre}
 .v3d-status-item{flex:none;white-space:pre}
+
+/* Map-specific fields use the same display section as viewport switches. */
+.v3d-check[data-v3d-display-type="range"]{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 8px}.v3d-check[data-v3d-display-type="range"] input{grid-column:1 / -1;grid-row:2;width:100%;min-width:0}.v3d-check[data-v3d-display-type="range"] output{grid-column:2;grid-row:1}.v3d-check[data-v3d-display-type="select"]{display:flex;justify-content:space-between;gap:8px}.v3d-check[data-v3d-display-type="select"] select{max-width:60%}
+
+/* Shared surface / wire / complete model skeleton controls. */
+/* Same compact segmented shading controls as Morphia; the host supplies accents. */
+.viewport-shading-tools{display:inline-flex;align-items:center;gap:1px;margin-right:3px;padding:1px;border:0;border-radius:4px;background:#171717;box-shadow:none}
+.viewport-shading-tools[hidden]{display:none}
+.viewport-shading-tool{display:inline-flex;align-items:center;justify-content:center;width:22px;min-width:22px;height:20px;padding:0;border:1px solid transparent;border-radius:3px;background:transparent;color:var(--b-text-dim);cursor:pointer}
+.viewport-shading-tool svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.viewport-shading-tool:hover:not(:disabled){background:var(--b-widget-hover);color:var(--b-text)}
+.viewport-shading-tool[aria-pressed=true]{background:var(--b-accent,#667d8c);color:#fff}.viewport-shading-tool[aria-pressed=true]:hover{background:var(--b-accent-hover,var(--b-accent,#667d8c));color:#fff}.viewport-shading-tool:disabled{opacity:.4;cursor:not-allowed}
+
+/* Host-provided active-object selector, preceding the mode selector. */
+.v3d-object-host:empty{display:none}.v3d-object-host{flex:0 1 175px;min-width:0;position:relative}.v3d-object-host [data-object-select]{min-width:0}
+.v3d-object-host .prep-select-trigger{min-height:25px}.v3d-object-host .prep-select-description{display:none}.v3d-object-host .prep-select-value{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
