@@ -10,6 +10,7 @@ export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnab
   if(camera.position.distanceTo(focus)<1e-6)camera.position.set(0,0,4);
   const initialPosition=camera.position.clone(),initialTarget=focus.clone(),initialZoom=camera.zoom??1;
   const pointers=new Map(),abort=new AbortController(),signal=abort.signal;
+  let enablePan=true;
   const size=()=>({width:Math.max(1,canvas.clientWidth||canvas.parentElement?.clientWidth||1),height:Math.max(1,canvas.clientHeight||canvas.parentElement?.clientHeight||1)});
   function changed(){camera.lookAt(focus);camera.updateProjectionMatrix?.();onChange();}
   function rotate(dx,dy){
@@ -28,6 +29,7 @@ export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnab
     changed();
   }
   function pan(dx,dy){
+    if(!enablePan)return;
     const s=size(),distance=camera.position.distanceTo(focus);
     const worldHeight=camera.isOrthographicCamera?Math.abs(camera.top-camera.bottom)/(camera.zoom||1):2*distance*Math.tan((camera.fov||45)*Math.PI/360);
     const right=new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion),up=new THREE.Vector3(0,1,0).applyQuaternion(camera.quaternion);
@@ -63,5 +65,5 @@ export function createViewportOrbit(viewport,{target=null,onChange=()=>{},isEnab
   if(!canvas.hasAttribute?.('aria-label'))canvas.setAttribute?.('aria-label','Интерактивная 3D-сцена');
   }
   camera.lookAt(focus);
-  return {target:focus,minDistance,maxDistance,rotate,pan,zoom,reset(){focus.copy(initialTarget);camera.position.copy(initialPosition);camera.zoom=initialZoom;changed();},dispose(){abort.abort();pointers.clear();}};
+  return {target:focus,minDistance,maxDistance,rotate,pan,zoom,get enablePan(){return enablePan;},set enablePan(value){enablePan=!!value;},update:changed,reset(){focus.copy(initialTarget);camera.position.copy(initialPosition);camera.zoom=initialZoom;changed();},dispose(){abort.abort();pointers.clear();}};
 }

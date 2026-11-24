@@ -3,6 +3,7 @@ import { createViewport3D, VIEWPORT3D_ID } from '../../../app/engine/viewport3d/
 import { VIEWPORT3D_TEMPLATE, mountViewportChrome } from './ui/ui.js';
 import { mountViewportStatus } from './ui/status.js';
 import { createViewportOrbit } from './camera/orbit.js';
+import { createViewportCharacterFocus } from './camera/character-focus.js';
 import { mountViewportGizmo } from './camera/gizmo.js';
 import { mountViewportNavigation } from './camera/navigation.js';
 
@@ -23,6 +24,7 @@ export { BASE_MAP_ID, BASE_MAP_GRID_PALETTE, isBaseMap, createBaseMapGrid, studi
 export { createGridFloorClass } from './environment/grid-floor.js';
 export { normalizeViewportEnvironment, discoverViewportEnvironments, createViewportEnvironments, mountViewportEnvironment } from './environment/environments.js';
 export { createViewportOrbit } from './camera/orbit.js';
+export { createViewportCharacterFocus } from './camera/character-focus.js';
 export { mountViewportGizmo } from './camera/gizmo.js';
 export { mountViewportNavigation, VIEWPORT3D_VIEW_DIRECTIONS } from './camera/navigation.js';
 
@@ -91,6 +93,18 @@ export function activateViewport3DScope({ node, viewport3d: config = {} } = {}) 
         onChange:()=>{options.onChange?.();navigation?.sync();invalidate();}});
       navigation=mountViewportNavigation({root:node,viewport,orbit,invalidate,
         isEnabled:config.navigationOptions?.isEnabled,fitObject:config.navigationOptions?.fitObject});
+      if(config.characterFocus){
+        const policy=config.characterFocus;
+        const focus=createViewportCharacterFocus({camera:viewport.camera,controls:orbit,element:viewport.canvas,
+          getAnchor:policy.getAnchor??(out=>viewport.activeObject?.getWorldPosition?.(out)??null),
+          isPreview:policy.isPreview,isControlMode:policy.isControlMode??(()=>chrome.modes.value.mode==='character'),onChange:invalidate});
+        const offs=[viewport.onActiveObjectChange(()=>focus.selectionChanged()),
+          chrome.modes.subscribe(()=>focus.modeChanged(),{immediate:false}),
+          viewport.onRender(()=>focus.update(),{phase:'before'})];
+        const offPreview=policy.subscribePreview?.(()=>focus.previewChanged());
+        if(typeof offPreview==='function')offs.push(offPreview);
+        focus.modeChanged();viewport.onDispose(()=>{for(const off of offs)off();focus.dispose();});
+      }
       const gizmoHost=node.querySelector('[data-v3d-gizmo]');
       if(gizmoHost) gizmo=mountViewportGizmo({host:gizmoHost,THREE:viewport.THREE,camera:viewport.camera,
         setView:navigation.setView,isEnabled:config.navigationOptions?.isEnabled,

@@ -456,3 +456,9 @@ The common viewport header includes these three modes. By default they follow `v
 
 ### Host object selector slot
 The shared viewport header provides `[data-v3d-object-host]` immediately before `[data-v3d-mode-host]`. It is empty and hidden when unused. A host may mount its active-object selector there; it owns the object list, import and lifecycle. The viewport does not create a second object state.
+
+### Camera focus on the controlled character
+
+`createViewportCharacterFocus` implements the shared editor camera policy without owning application characters. The host supplies `camera`, orbit `controls`, `getAnchor(out)` (world-space character midpoint), `isPreview()` and `isControlMode()`. Notify it via `selectionChanged()`, `previewChanged()` and `modeChanged()` after the corresponding host state changes, and call `update()` each editor frame. It translates camera and target together without changing the character or zoom. In control mode it follows the anchor and disables free panning; when `element` is supplied, right-drag adjusts only the world-vertical framing offset, which remains while the character moves. The previous pan setting is restored on exit/disposal. During gameplay it does not move the gameplay camera.
+
+For the built-in scope, opt in with `viewport3d.characterFocus`: it defaults to the viewport's active object's world origin and mode id `character`; provide `getAnchor` for a body midpoint, `isPreview`, and `subscribePreview(callback)` returning an unsubscribe function to integrate a host's gameplay lifecycle. Selection and mode changes, render updates and disposal are wired by the scope. Projects with their own camera controls can use the same controller directly, as Morphia does. A host must supply its active character and gameplay state; a generic viewport cannot infer these from unrelated application state.

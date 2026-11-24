@@ -32,6 +32,7 @@ export {
   mountViewportGraphics,
   mountViewportChrome,
   createViewportOrbit,
+  createViewportCharacterFocus,
 } from "../studio/scopes/viewport3d/index.js";
 
 export {

@@ -7,7 +7,7 @@
  */
 export * from "./main.js";
 export { initMenuContributions, initViewMenu, initViewportMenu } from "../studio/menu/index.js";
-export { initCollapsibleSections, installVirtualDockSizing, installCompactDockSizing, createToolCatalogue } from "../studio/shell/index.js";
+export { initCollapsibleSections, installVirtualDockSizing, installCompactDockSizing, createToolCatalogue, installStudioBrowserGestureGuard } from "../studio/shell/index.js";
 export {
   validateTopbarMenus,
   validateTopbarSections,

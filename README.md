@@ -492,3 +492,7 @@ need a clean floorless viewport can pass `environmentOptions: { gridVisible:
 false, studioColors: { pedestalVisible: false } }` to `mountViewportChrome`.
 The grid remains separately controllable and the pedestal remains enabled for
 existing hosts by default.
+
+### Защита студии от браузерных жестов
+
+`installStudioBrowserGestureGuard({root})` из `framework-preparatorio/shell` отключает горизонтальный overscroll на документе и отменяет стандартные действия ПКМ и кнопок назад/вперёд на поверхности студии, не останавливая распространение событий к инструментам. Для портальных меню удобнее передать `document.body`; поля ввода сохраняют своё контекстное меню. Возвращённую функцию следует вызвать при размонтировании. Не все действия браузера, расширений и ОС доступны странице для отмены; в частности системные жесты могут перехватываться вне DOM.
