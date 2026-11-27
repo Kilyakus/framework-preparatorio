@@ -1,7 +1,7 @@
 {
   "name": "framework-preparatorio",
-  "version": "1.3.3",
-  "description": "Каркас интерфейса редактора на областях (scope): реестр областей, связывание паспорта с реализацией, доступность элементов управления, меню тулбара и справка из вкладов областей, загрузка каталога областей, сборка приложения из движков",
+  "version": "1.4.0",
+  "description": "Каркас интерфейса редактора на областях (scope): реестр областей, связывание паспорта с реализацией, доступность элементов управления, меню тулбара и справка из вкладов областей, загрузка каталога областей, сборка приложения из движков; ядро приложения: модули, контейнер компонентов, события и конфигурация",
   "type": "module",
   "license": "MIT",
   "author": "Kilyakus",
@@ -14,11 +14,14 @@
     "url": "https://github.com/Kilyakus/framework-preparatorio/issues"
   },
   "keywords": [
+    "container",
     "dock",
     "editor",
     "framework",
     "help",
+    "kernel",
     "lumino",
+    "module",
     "preparatorio",
     "runtime",
     "scope",
@@ -45,6 +48,7 @@
     "./runtime": "./src/studio/runtime/index.js",
     "./shell": "./src/studio/shell/index.js",
     "./composition": "./src/app/composition/index.js",
+    "./core": "./src/core/index.js",
     "./package.json": "./package.json"
   },
   "scripts": {

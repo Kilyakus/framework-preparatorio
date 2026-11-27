@@ -3,6 +3,17 @@
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.1.0/),
 версионирование — [Semantic Versioning](https://semver.org/lang/ru/).
 
+## [1.4.0]
+
+- Добавлено ядро приложения `src/core` (экспорт `framework-preparatorio/core`
+  и корневой `main.js`): `createApplication`, паспорта модулей
+  (`defineModule`), порядок запуска по `requires`/`optional` с проверкой
+  версий и циклов, контейнер компонентов с ленивым созданием, шина событий,
+  слияние и загрузка конфигурации, параметры модулей.
+- Модули вносят паспорта движков и областей, а ядро передаёт их прежним
+  `registerScopeDefinitions` / `bindScopeImplementations`: приложения,
+  собранные вручную, работают без изменений. Подробно: `docs/CORE.md`.
+
 ## [1.3.0] — 2026-11-24
 
 - В настройках `viewport3d` добавлена секция «Глобальное освещение»:
